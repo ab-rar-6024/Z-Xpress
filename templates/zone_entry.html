@@ -1,0 +1,176 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<h4 class="mb-3">Place Zone Entry</h4>
+
+<div class="d-flex justify-content-end mb-2">
+    <a href="/place-zones-export" class="btn btn-success">
+        <i class="fa fa-file-excel"></i> Export to Excel
+    </a>
+</div>
+
+<!-- ENTRY / EDIT FORM -->
+<div class="card p-3 mb-4">
+    <form method="post" id="pz-form">
+        <input type="hidden" name="_action"  id="pz-action"  value="add">
+        <input type="hidden" name="edit_id"  id="pz-edit-id" value="">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label">Place</label>
+                <input type="text" name="place" id="f-place"
+                       class="form-control" placeholder="ENTER PLACE" required
+                       autocomplete="off">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Zone</label>
+                <select name="zone" id="f-zone" class="form-select" required>
+                    <option value="">— Select Zone —</option>
+                    <option value="1">1 — Chennai</option>
+                    <option value="2">2 — Tamil Nadu</option>
+                    <option value="3">3 — South India</option>
+                    <option value="4">4 — North Metro</option>
+                    <option value="5">5 — ROI</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Place Code <small class="text-muted">(optional)</small></label>
+                <input type="text" name="place_code" id="f-place-code"
+                       class="form-control" placeholder="e.g. MAS">
+            </div>
+            <div class="col-md-3 d-flex gap-1">
+                <button type="submit" class="btn btn-success flex-fill">
+                    <i class="fa fa-save"></i> <span id="save-lbl">Save</span>
+                </button>
+                <button type="button" class="btn btn-secondary" id="cancel-btn"
+                        style="display:none" onclick="pzCancel()">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- SEARCH BAR -->
+<div class="mb-3">
+    <input type="text" id="pz-search" class="form-control"
+           placeholder="🔍 Search by place name..." style="max-width:320px;">
+</div>
+
+<!-- TABLE -->
+<div class="card p-3">
+    <h6 class="mb-3">
+        Place Zone List
+        <span class="badge bg-secondary ms-2">{{ zones|length }} records</span>
+    </h6>
+    <div class="table-responsive">
+        <table class="table table-bordered table-striped align-middle mb-0" id="pz-table">
+            <thead class="table-dark">
+                <tr>
+                    <th width="6%"  class="text-center">#</th>
+                    <th width="38%">Place</th>
+                    <th width="28%">Zone</th>
+                    <th width="12%" class="text-center">Zone No.</th>
+                    <th width="16%" class="text-center">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for z in zones %}
+                <tr>
+                    <td class="text-center">{{ loop.index }}</td>
+                    <td>
+                        {{ z.place }}
+                        {% if z.place_code %}
+                            <span class="badge bg-light text-dark border ms-1" style="font-size:.75em;">
+                                {{ z.place_code }}
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td>{{ z.zone_label }}</td>
+                    <td class="text-center">
+                        {% set zn = z.zone | int %}
+                        <span class="badge rounded-pill px-3
+                            {% if zn == 1 %}bg-primary
+                            {% elif zn == 2 %}bg-success
+                            {% elif zn == 3 %}bg-warning text-dark
+                            {% elif zn == 4 %}bg-danger
+                            {% else %}bg-secondary{% endif %}">
+                            Zone {{ z.zone }}
+                        </span>
+                    </td>
+                    <td class="text-center">
+                        {% if role == 'admin' %}
+                        <button class="btn btn-warning btn-sm"
+                            onclick="pzEdit({{ z.id }},'{{ z.place }}',{{ z.zone | int }},'{{ z.place_code or '' }}')">
+                            <i class="fa fa-pen"></i> Edit
+                        </button>
+                        <form method="post" id="pzdel-{{ z.id }}" style="display:inline">
+                            <input type="hidden" name="_action" value="delete">
+                            <input type="hidden" name="del_id"  value="{{ z.id }}">
+                            <button type="button" class="btn btn-danger btn-sm"
+                                onclick="confirmDel('pzdel-{{ z.id }}')">
+                                <i class="fa fa-trash"></i>
+                            </button>
+                        </form>
+                        {% else %}
+                        <span class="text-muted small">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center text-muted py-4">No Records Found</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+// ── Auto-uppercase inputs ──────────────────────────────────
+['f-place','f-place-code'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('input', function() {
+        var s = this.selectionStart, e = this.selectionEnd;
+        this.value = this.value.toUpperCase();
+        this.setSelectionRange(s, e);
+    });
+});
+
+// ── Edit ──────────────────────────────────────────────────
+function pzEdit(id, place, zone, placeCode) {
+    document.getElementById('pz-action').value   = 'edit';
+    document.getElementById('pz-edit-id').value  = id;
+    document.getElementById('f-place').value      = place;
+    document.getElementById('f-zone').value       = zone;
+    document.getElementById('f-place-code').value = placeCode || '';
+    document.getElementById('save-lbl').textContent     = 'Update';
+    document.getElementById('cancel-btn').style.display = 'inline-block';
+    document.getElementById('f-place').focus();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ── Cancel ────────────────────────────────────────────────
+function pzCancel() {
+    document.getElementById('pz-action').value   = 'add';
+    document.getElementById('pz-edit-id').value  = '';
+    document.getElementById('f-place').value      = '';
+    document.getElementById('f-zone').value       = '';
+    document.getElementById('f-place-code').value = '';
+    document.getElementById('save-lbl').textContent     = 'Save';
+    document.getElementById('cancel-btn').style.display = 'none';
+}
+
+// ── Live search filter ────────────────────────────────────
+document.getElementById('pz-search').addEventListener('input', function() {
+    var q = this.value.toUpperCase();
+    document.querySelectorAll('#pz-table tbody tr').forEach(function(tr) {
+        var text = tr.textContent.toUpperCase();
+        tr.style.display = text.includes(q) ? '' : 'none';
+    });
+});
+</script>
+{% endblock %}

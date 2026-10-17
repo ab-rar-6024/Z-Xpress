@@ -1,0 +1,1118 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<h4>Day Book</h4>
+
+<!-- FILTER FORM -->
+<div class="card p-3 mb-3">
+    <div class="row g-2">
+        <div class="col-md-2">
+            <label>From Date</label>
+            <input type="date" id="filter-from-date" class="form-control" value="{{ from_date }}">
+        </div>
+        <div class="col-md-2">
+            <label>To Date</label>
+            <input type="date" id="filter-to-date" class="form-control" value="{{ to_date }}">
+        </div>
+        <div class="col-md-2">
+            <label>Code</label>
+            <input id="filter-code" class="form-control" placeholder="Any">
+        </div>
+        <div class="col-md-2">
+            <label>Weight</label>
+            <input type="number" step="0.01" id="filter-weight" class="form-control" placeholder="Any">
+        </div>
+        <div class="col-md-2">
+            <label>AWB No</label>
+            <input id="filter-awb" class="form-control" placeholder="Any">
+        </div>
+        <div class="col-md-2">
+            <label>Destination</label>
+            <input id="filter-dest" class="form-control" placeholder="Any">
+        </div>
+        <div class="col-md-2">
+            <label>Courier</label>
+            <input id="filter-courier" class="form-control" placeholder="Any">
+        </div>
+        <div class="col-md-2 d-flex align-items-end gap-2">
+            <button class="btn btn-primary w-100" id="filter-btn">
+                <i class="fa fa-filter"></i> Filter
+            </button>
+            <button class="btn btn-secondary" id="reset-btn">
+                <i class="fa fa-undo"></i> Reset
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- EXPORT + IMPORT + PDF -->
+<div class="d-flex gap-2 mb-2">
+    <button type="button" class="btn btn-success" id="btn-daybook-export">
+        <i class="fa fa-file-excel"></i> Export to Excel
+    </button>
+    <button type="button" class="btn btn-info" id="import-trigger-btn"
+            data-bs-toggle="modal" data-bs-target="#importModal">
+        <i class="fa fa-file-import"></i> Import Excel
+    </button>
+    <button type="button" class="btn btn-danger" id="btn-daybook-pdf">
+        <i class="fa fa-file-pdf"></i> PDF
+    </button>
+    {% if role == 'admin' %}
+    <button type="button" class="btn btn-outline-danger" id="btn-delete-selected" disabled>
+        <i class="fa fa-trash" id="delete-selected-icon"></i>
+        <span id="delete-selected-text">Delete Selected</span> (<span id="selected-count">0</span>)
+    </button>
+    {% endif %}
+</div>
+
+<!-- TABLE -->
+<div class="card p-3">
+    <div id="table-loading" class="text-center py-3" style="display:none;">
+        <i class="fa fa-spinner fa-spin"></i> Loading...
+    </div>
+    <div class="table-responsive">
+        <table class="table table-bordered table-sm" id="daybook-table">
+            <thead class="table-dark">
+                <tr>
+                    <th>
+                        {% if role == 'admin' %}
+                        <input type="checkbox" id="select-all-checkbox" title="Select all">
+                        {% else %}
+                        SNO
+                        {% endif %}
+                    </th>
+                    <th>Code</th><th>Company Name</th><th>Date</th>
+                    <th>AWB</th><th>Dest</th><th class="text-end">Wt</th><th class="text-end">Total</th><th>Actions</th>
+                </tr>
+                <tr class="filter-row">
+                    <th></th>
+                    <th><input type="text" class="form-control form-control-sm col-filter" data-col="1" placeholder="Filter..."></th>
+                    <th><input type="text" class="form-control form-control-sm col-filter" data-col="2" placeholder="Filter..."></th>
+                    <th><input type="text" class="form-control form-control-sm col-filter" data-col="3" placeholder="Filter..."></th>
+                    <th><input type="text" class="form-control form-control-sm col-filter" data-col="4" placeholder="Filter..."></th>
+                    <th><input type="text" class="form-control form-control-sm col-filter" data-col="5" placeholder="Filter..."></th>
+                    <th><input type="text" class="form-control form-control-sm col-filter" data-col="6" placeholder="Filter..."></th>
+                    <th><input type="text" class="form-control form-control-sm col-filter" data-col="7" placeholder="Filter..."></th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="daybook-tbody">
+                <tr><td colspan="9" class="text-center text-muted py-4">
+                    <i class="fa fa-filter"></i>&nbsp; Set filters above and click <strong>Filter</strong> to load data.
+                </td></tr>
+            </tbody>
+        </table>
+    </div>
+    <h6 class="text-end mt-2" id="total-sum-display">
+        <strong>Sum of Total Amount: 0.00</strong>
+    </h6>
+</div>
+
+<!-- IMPORT MODAL -->
+<div class="modal fade" id="importModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Import Bookings from Excel</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="d-flex gap-2 align-items-center mb-3">
+            <input type="file" id="import-file" class="form-control" accept=".xlsx,.xls">
+            <button type="button" class="btn btn-primary text-nowrap" id="import-preview-btn">
+                <i class="fa fa-eye"></i> Preview
+            </button>
+        </div>
+        <div id="import-status" class="mb-2"></div>
+        <div class="table-responsive" style="max-height:400px; overflow-y:auto;">
+          <table class="table table-bordered table-sm">
+            <thead class="table-dark">
+              <tr>
+                <th>Row</th><th>Code</th><th>Date</th><th>AWB</th><th>Destination</th>
+                <th>Weight</th><th>Amount</th><th>Zone</th><th>Courier</th><th>Status</th><th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="import-preview-body"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-outline-danger" id="import-discard-btn" style="display:none;">
+          <i class="fa fa-eraser"></i> Discard
+        </button>
+        <button type="button" class="btn btn-success" id="import-save-btn" style="display:none;">
+          <i class="fa fa-save"></i> Save Import
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT BOOKING MODAL -->
+<div class="modal fade" id="editBookingModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Edit Booking</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="edit-id">
+        <div class="row g-2">
+          <div class="col-md-3">
+            <label class="form-label">Code</label>
+            <input id="edit-code" class="form-control">
+          </div>
+          <div class="col-md-5">
+            <label class="form-label">Company Name</label>
+            <input id="edit-code-fullform" class="form-control">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Date</label>
+            <input type="date" id="edit-date" class="form-control">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">AWB No</label>
+            <input id="edit-awb" class="form-control">
+          </div>
+          <div class="col-md-5">
+            <label class="form-label">Destination</label>
+            <input id="edit-dest" class="form-control">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Weight</label>
+            <input type="number" step="0.01" id="edit-weight" class="form-control">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Courier</label>
+            <input id="edit-courier" class="form-control">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Zone</label>
+            <select id="edit-zone" class="form-select">
+              <option value="1">1 - Chennai</option>
+              <option value="2">2 - Tamil Nadu</option>
+              <option value="3">3 - South India</option>
+              <option value="4">4 - North Metro</option>
+              <option value="5">5 - ROI</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Auto Amount</label>
+            <input type="number" step="0.01" id="edit-auto-amount" class="form-control" min="0" max="999999">
+          </div>
+        </div>
+        <div id="edit-status" class="mt-3"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="edit-save-btn">
+          <i class="fa fa-save"></i> Save Changes
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const userRole = "{{ role }}";
+
+// ---- Filter inputs ----
+const fromDateInput = document.getElementById('filter-from-date');
+const toDateInput   = document.getElementById('filter-to-date');
+const codeInput     = document.getElementById('filter-code');
+const weightInput   = document.getElementById('filter-weight');
+const awbInput      = document.getElementById('filter-awb');
+const destInput     = document.getElementById('filter-dest');
+const courierInput  = document.getElementById('filter-courier');
+const filterBtn     = document.getElementById('filter-btn');
+const resetBtn      = document.getElementById('reset-btn');
+
+// ---- Table elements ----
+const tbody      = document.getElementById('daybook-tbody');
+const loadingDiv = document.getElementById('table-loading');
+const totalSpan  = document.getElementById('total-sum-display');
+
+// ---- Bulk-select elements (admin only; may be null for non-admins) ----
+const selectAllCheckbox  = document.getElementById('select-all-checkbox');
+const deleteSelectedBtn  = document.getElementById('btn-delete-selected');
+const selectedCountSpan  = document.getElementById('selected-count');
+
+let serverTotalSum = 0;
+let currentRows    = [];
+let dataLoaded     = false; // ── track if data has been loaded at least once
+
+// ---- Helpers ----
+function escapeHtml(str) {
+    if (!str && str !== 0) return '';
+    return String(str).replace(/[&<>]/g, function(m) {
+        if (m === '&') return '&amp;';
+        if (m === '<') return '&lt;';
+        if (m === '>') return '&gt;';
+        return m;
+    });
+}
+
+function formatDisplayDate(iso) {
+    if (!iso) return '';
+    const parts = String(iso).split('-');
+    if (parts.length !== 3) return iso;
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+}
+
+function actionsCellHtml(row) {
+    if (userRole !== 'admin') return '';
+    return `
+        <button type="button" class="btn btn-sm btn-outline-primary me-1 edit-row-btn" data-id="${row.id}" title="Edit">
+            <i class="fa fa-pen"></i>
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-danger delete-row-btn" data-id="${row.id}" title="Delete">
+            <i class="fa fa-trash"></i>
+        </button>`;
+}
+
+// ---- SNO column: checkbox for admins (bulk select), plain number for everyone else ----
+function snoCellHtml(row, idx) {
+    if (userRole !== 'admin') return `${idx + 1}`;
+    return `<input type="checkbox" class="row-select-checkbox" data-id="${row.id}">`;
+}
+
+// ---- Build a FormData/params object with the current filters ----
+// (shared by fetch, excel export, and pdf export so they always agree)
+function buildFilterParams() {
+    const params = {};
+    if (fromDateInput.value) params.from_date   = fromDateInput.value;
+    if (toDateInput.value)   params.to_date     = toDateInput.value;
+    if (codeInput.value)     params.code        = codeInput.value;
+    if (weightInput.value)   params.weight      = weightInput.value;
+    if (awbInput.value)      params.awb_no      = awbInput.value;
+    if (destInput.value)     params.destination = destInput.value;
+    if (courierInput.value)  params.courier     = courierInput.value;
+    return params;
+}
+
+// ---- Fetch & render table ----
+async function fetchAndUpdate() {
+    const filters = buildFilterParams();
+    const params  = new URLSearchParams(filters);
+
+    loadingDiv.style.display = 'block';
+    tbody.innerHTML = '<tr><td colspan="9" class="text-center">Loading...</td></tr>';
+
+    try {
+        const response = await fetch(`/day-book/filter?${params.toString()}`);
+        if (!response.ok) throw new Error('Network error');
+        const data = await response.json();
+
+        currentRows = data.rows || [];
+        dataLoaded  = true;
+
+        if (currentRows.length) {
+            let html = '';
+            currentRows.forEach((row, idx) => {
+                html += `<tr data-id="${row.id}">
+                    <td class="text-center">${snoCellHtml(row, idx)}</td>
+                    <td>${escapeHtml(row.code)}</td>
+                    <td>${escapeHtml(row.code_fullform)}</td>
+                    <td>${escapeHtml(formatDisplayDate(row.booking_date))}</td>
+                    <td>${escapeHtml(row.awb_no)}</td>
+                    <td>${escapeHtml(row.destination)}</td>
+                    <td class="text-end">${parseFloat(row.weight || 0).toFixed(3)}</td>
+                    <td class="text-end">${parseFloat(row.total_amount || 0).toFixed(2)}</td>
+                    <td class="text-center text-nowrap">${actionsCellHtml(row)}</td>
+                </tr>`;
+            });
+            tbody.innerHTML = html;
+        } else {
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">No records found for the selected filters.</td></tr>';
+        }
+
+        serverTotalSum = parseFloat(data.total_sum || 0);
+        totalSpan.innerHTML = `<strong>Sum of Total Amount: ${serverTotalSum.toFixed(2)}</strong>`;
+        applyColumnFilters();
+
+        // reset bulk-select state on every reload
+        if (selectAllCheckbox) selectAllCheckbox.checked = false;
+        updateSelectedCount();
+
+    } catch (err) {
+        console.error(err);
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-danger">Failed to load data</td></tr>';
+        totalSpan.innerHTML = '<strong>Sum of Total Amount: 0.00</strong>';
+    } finally {
+        loadingDiv.style.display = 'none';
+    }
+}
+
+function resetFilters() {
+    fromDateInput.value = '';
+    toDateInput.value   = '';
+    codeInput.value     = '';
+    weightInput.value   = '';
+    awbInput.value      = '';
+    destInput.value     = '';
+    courierInput.value  = '';
+    document.querySelectorAll('.col-filter').forEach(inp => inp.value = '');
+    // ── Reset to initial state — don't auto-fetch ──
+    dataLoaded     = false;
+    currentRows    = [];
+    serverTotalSum = 0;
+    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4"><i class="fa fa-filter"></i>&nbsp; Set filters above and click <strong>Filter</strong> to load data.</td></tr>';
+    totalSpan.innerHTML = '<strong>Sum of Total Amount: 0.00</strong>';
+    if (selectAllCheckbox) selectAllCheckbox.checked = false;
+    updateSelectedCount();
+}
+
+filterBtn.addEventListener('click', fetchAndUpdate);
+resetBtn.addEventListener('click', resetFilters);
+
+// ---- Export to Excel (saves to Downloads, shows path) ----
+document.getElementById('btn-daybook-export').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-daybook-export');
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Exporting...';
+    try {
+        const filters = buildFilterParams();
+        const fd = new FormData();
+        Object.entries(filters).forEach(([k, v]) => fd.append(k, v));
+
+        const r = await fetch('/day-book-export', { method: 'POST', body: fd });
+        const text = await r.text();
+        if (!r.ok) { alert('Export failed (HTTP ' + r.status + '): ' + text); return; }
+        let d;
+        try { d = JSON.parse(text); }
+        catch (e) { alert('Server did not return JSON:\n' + text); return; }
+        if (d.status === 'ok') {
+            showToast('✅ Saved to Downloads: ' + (d.path ? d.path.split('\\').pop().split('/').pop() : 'DayBook.xlsx'));
+        } else {
+            alert(d.message || 'Export failed');
+        }
+    } catch (e) {
+        alert('Export failed: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = original;
+    }
+});
+
+// ---- Export to PDF (saves to Downloads, shows path) ----
+document.getElementById('btn-daybook-pdf').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-daybook-pdf');
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Generating...';
+    try {
+        const filters = buildFilterParams();
+        const fd = new FormData();
+        Object.entries(filters).forEach(([k, v]) => fd.append(k, v));
+
+        const r = await fetch('/day-book-pdf', { method: 'POST', body: fd });
+        const text = await r.text();
+        if (!r.ok) { alert('PDF export failed (HTTP ' + r.status + '): ' + text); return; }
+        let d;
+        try { d = JSON.parse(text); }
+        catch (e) { alert('Server did not return JSON:\n' + text); return; }
+        if (d.status === 'ok') {
+            showToast('✅ Saved to Downloads: ' + (d.path ? d.path.split('\\').pop().split('/').pop() : 'DayBook.pdf'));
+        } else {
+            alert(d.message || 'PDF export failed');
+        }
+    } catch (e) {
+        alert('PDF export failed: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = original;
+    }
+});
+
+// ---- Toast helper ----
+function showToast(msg) {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        container.style.cssText = 'position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;display:flex;flex-direction:column;gap:.5rem;';
+        document.body.appendChild(container);
+    }
+    const toast = document.createElement('div');
+    toast.style.cssText = 'background:#212529;color:#fff;padding:.75rem 1.25rem;border-radius:.4rem;box-shadow:0 4px 12px rgba(0,0,0,.3);font-size:.9rem;max-width:360px;word-break:break-all;';
+    toast.textContent = msg;
+    container.appendChild(toast);
+    setTimeout(() => { toast.remove(); }, 4000);
+}
+
+// ---- Column filters (inline search within loaded rows) ----
+// Columns 6 (Wt) and 7 (Total) use numeric matching so typing "0" or "0.00"
+// both match a cell whose actual value is zero, instead of doing text search.
+const NUMERIC_COLS = [6, 7];
+
+function applyColumnFilters() {
+    const filters = Array.from(document.querySelectorAll('.col-filter'))
+        .map(inp => ({ col: parseInt(inp.dataset.col, 10), value: inp.value.trim() }))
+        .filter(f => f.value !== '');
+
+    const rows = tbody.querySelectorAll('tr');
+    let visibleSum  = 0;
+    let anyDataRows = false;
+
+    rows.forEach(tr => {
+        const cells = tr.querySelectorAll('td');
+        if (cells.length < 9) return;
+        anyDataRows = true;
+
+        const match = filters.every(f => {
+            const cellText = (cells[f.col]?.textContent || '').trim();
+
+            if (NUMERIC_COLS.includes(f.col)) {
+                const cellNum   = parseFloat(cellText);
+                const filterNum = parseFloat(f.value);
+                // If either side isn't a valid number, fall back to text search
+                if (isNaN(cellNum) || isNaN(filterNum)) {
+                    return cellText.toLowerCase().includes(f.value.toLowerCase());
+                }
+                // Compare numerically with a small tolerance for float rounding
+                return Math.abs(cellNum - filterNum) < 0.005;
+            }
+
+            return cellText.toLowerCase().includes(f.value.toLowerCase());
+        });
+
+        tr.style.display = match ? '' : 'none';
+        if (match) visibleSum += parseFloat(cells[7].textContent) || 0;
+
+        // Hidden rows shouldn't stay "selected" for bulk delete
+        if (!match) {
+            const cb = tr.querySelector('.row-select-checkbox');
+            if (cb) cb.checked = false;
+        }
+    });
+
+    if (!anyDataRows) return;
+    totalSpan.innerHTML = filters.length
+        ? `<strong>Sum of Total Amount: ${visibleSum.toFixed(2)} (filtered)</strong>`
+        : `<strong>Sum of Total Amount: ${serverTotalSum.toFixed(2)}</strong>`;
+
+    updateSelectedCount();
+}
+
+document.querySelectorAll('.col-filter').forEach(inp => {
+    inp.addEventListener('input', applyColumnFilters);
+});
+
+// ============================================================
+// BULK SELECT / DELETE (SNO column checkboxes — admin only)
+// ============================================================
+function getRowCheckboxes() {
+    return Array.from(tbody.querySelectorAll('.row-select-checkbox'));
+}
+
+function updateSelectedCount() {
+    if (!deleteSelectedBtn) return; // non-admin users don't have this button
+    const checked = getRowCheckboxes().filter(cb => cb.checked);
+    selectedCountSpan.textContent = checked.length;
+    deleteSelectedBtn.disabled = checked.length === 0;
+}
+
+if (selectAllCheckbox) {
+    selectAllCheckbox.addEventListener('change', () => {
+        getRowCheckboxes().forEach(cb => {
+            const tr = cb.closest('tr');
+            // only select rows that are currently visible (respect column filters)
+            if (tr.style.display !== 'none') cb.checked = selectAllCheckbox.checked;
+        });
+        updateSelectedCount();
+    });
+}
+
+tbody.addEventListener('change', (e) => {
+    if (e.target.classList.contains('row-select-checkbox')) updateSelectedCount();
+});
+
+if (deleteSelectedBtn) {
+    deleteSelectedBtn.addEventListener('click', async () => {
+        const ids = getRowCheckboxes().filter(cb => cb.checked).map(cb => cb.dataset.id);
+        if (!ids.length) return;
+        if (!confirm(`Delete ${ids.length} selected booking(s)? This cannot be undone.`)) return;
+
+        // NOTE: we never touch deleteSelectedBtn.innerHTML directly — doing so
+        // used to replace the #selected-count span with a fresh (detached-looking)
+        // node reference issue, causing the counter to get "stuck". Instead we
+        // only swap the icon class and the text span's textContent, leaving the
+        // #selected-count span untouched the whole time.
+        const icon     = document.getElementById('delete-selected-icon');
+        const textSpan = document.getElementById('delete-selected-text');
+
+        deleteSelectedBtn.disabled = true;
+        icon.className = 'fa fa-spinner fa-spin';
+        textSpan.textContent = 'Deleting...';
+
+        let successCount = 0;
+        let failCount    = 0;
+
+        for (const id of ids) {
+            try {
+                const res  = await fetch(`/day-book/delete/${id}`, { method: 'POST' });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok && data.success) successCount++;
+                else failCount++;
+            } catch (err) {
+                console.error(err);
+                failCount++;
+            }
+        }
+
+        if (failCount) {
+            alert(`Deleted ${successCount} record(s). ${failCount} failed — see console for details.`);
+        } else {
+            showToast(`✅ Deleted ${successCount} record(s).`);
+        }
+
+        icon.className = 'fa fa-trash';
+        textSpan.textContent = 'Delete Selected';
+        if (selectAllCheckbox) selectAllCheckbox.checked = false;
+        fetchAndUpdate(); // this re-renders rows and calls updateSelectedCount(), resetting the count to 0
+    });
+}
+
+// ---- Row actions: edit / delete ----
+tbody.addEventListener('click', (e) => {
+    const editBtn = e.target.closest('.edit-row-btn');
+    if (editBtn) { openEditModal(editBtn.dataset.id); return; }
+
+    const delBtn = e.target.closest('.delete-row-btn');
+    if (delBtn) { deleteRow(delBtn.dataset.id); return; }
+});
+
+// ============================================================
+// SHARED RATE-CALCULATION HELPER (same slabs as booking entry)
+// ============================================================
+function computeAutoAmount(rateRow, weight) {
+    if (!rateRow) return 0;
+    const slabs = [
+        [0.25,     'rate_250g'],
+        [0.50,     'rate_500g'],
+        [1.00,     'rate_500g_1'],
+        [3.00,     'rate_1_to_3kg'],
+        [10.00,    'rate_3_to_10kg'],
+        [Infinity, 'rate_above_10kg']
+    ];
+    for (const [maxW, col] of slabs) {
+        if (weight <= maxW) {
+            const rate = parseFloat(rateRow[col] || 0);
+            const amt  = maxW > 1 ? rate * Math.ceil(weight) : rate;
+            return Math.round(amt);
+        }
+    }
+    return 0;
+}
+
+// ============================================================
+// EDIT MODAL — open + auto-recalculate amount
+// ============================================================
+function openEditModal(id) {
+    const row = currentRows.find(r => String(r.id) === String(id));
+    if (!row) {
+        alert('Could not find that record — try refreshing the table.');
+        return;
+    }
+    document.getElementById('edit-id').value             = row.id;
+    document.getElementById('edit-code').value           = row.code || '';
+    document.getElementById('edit-code-fullform').value  = row.code_fullform || '';
+    document.getElementById('edit-date').value           = row.booking_date || '';
+    document.getElementById('edit-awb').value            = row.awb_no || '';
+    document.getElementById('edit-dest').value            = row.destination || '';
+    document.getElementById('edit-weight').value         = row.weight || '';
+    document.getElementById('edit-courier').value        = row.courier || '';
+    document.getElementById('edit-zone').value           = row.zone || '5';
+    document.getElementById('edit-auto-amount').value    = row.auto_amount || '';
+    document.getElementById('edit-status').innerHTML     = '';
+    showModal('editBookingModal');
+
+    // Auto-recalculate as soon as the modal opens
+    recalcEditAmount();
+}
+
+// Recalculate the Auto Amount from code + zone + weight
+let editRateTimer = null;
+
+async function recalcEditAmount() {
+    const code   = document.getElementById('edit-code').value.trim().toUpperCase();
+    const zone   = document.getElementById('edit-zone').value;
+    const weight = parseFloat(document.getElementById('edit-weight').value) || 0;
+    const amtEl  = document.getElementById('edit-auto-amount');
+    const status = document.getElementById('edit-status');
+
+    if (!code || !zone || weight <= 0) return;
+
+    status.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Calculating rate...';
+    try {
+        const res     = await fetch(`/api/rate/lookup?code=${encodeURIComponent(code)}&zone=${encodeURIComponent(zone)}`);
+        const rateRow = await res.json();
+        if (!rateRow || !Object.keys(rateRow).length) {
+            status.innerHTML = `<span class="text-danger">No rate found for ${escapeHtml(code)} zone ${zone} — amount unchanged.</span>`;
+            return;
+        }
+        if (rateRow.code_fullform) {
+            document.getElementById('edit-code-fullform').value = rateRow.code_fullform;
+        }
+        const amt = computeAutoAmount(rateRow, weight);
+        amtEl.value = amt;
+        status.innerHTML = `<span class="text-success">✓ Zone ${zone} · Weight ${weight} → Amount ${amt}</span>`;
+    } catch (err) {
+        console.error(err);
+        status.innerHTML = '<span class="text-danger">Rate lookup failed.</span>';
+    }
+}
+
+// ---- Company Name lookup, independent of Zone ----
+// recalcEditAmount() only fills Company Name as a side-effect of a
+// code+zone rate match — so if the typed code has no rate row for
+// whatever zone happens to be selected right now, the name never
+// updates even though the code itself is valid. This looks it up
+// directly by code so it always fills in, regardless of zone.
+async function fetchCodeFullform(code) {
+    if (!code) return null;
+    try {
+        const res  = await fetch(`/api/ac/code?q=${encodeURIComponent(code)}`);
+        const list = await res.json();
+        const match = (list || []).find(r => (r.code || '').toUpperCase() === code.toUpperCase());
+        return match ? (match.code_fullform || null) : null;
+    } catch (err) {
+        console.error(err);
+        return null;
+    }
+}
+
+// ---- Zone auto-detect from Destination (same smart lookup the
+//      booking entry page uses) ----
+async function fetchZoneForDestination(dest, code) {
+    if (!dest) return null;
+    try {
+        const res  = await fetch(`/api/smart-zone?dest=${encodeURIComponent(dest)}&code=${encodeURIComponent(code || '')}`);
+        const data = await res.json();
+        return (data && data.zone) ? String(data.zone) : null;
+    } catch (err) {
+        console.error(err);
+        return null;
+    }
+}
+
+// Code changed: fill Company Name immediately (independent of zone),
+// then still run the debounced rate/amount recalculation.
+document.getElementById('edit-code').addEventListener('change', async () => {
+    const code = document.getElementById('edit-code').value.trim().toUpperCase();
+    const fullform = await fetchCodeFullform(code);
+    if (fullform) {
+        document.getElementById('edit-code-fullform').value = fullform;
+    }
+    clearTimeout(editRateTimer);
+    editRateTimer = setTimeout(recalcEditAmount, 150);
+});
+
+// Zone changed manually: just recalc the amount (short debounce)
+document.getElementById('edit-zone').addEventListener('change', () => {
+    clearTimeout(editRateTimer);
+    editRateTimer = setTimeout(recalcEditAmount, 150);
+});
+
+// Destination changed: auto-detect the Zone, then recalc the amount
+document.getElementById('edit-dest').addEventListener('change', async () => {
+    const dest = document.getElementById('edit-dest').value.trim().toUpperCase();
+    const code = document.getElementById('edit-code').value.trim().toUpperCase();
+    const status = document.getElementById('edit-status');
+
+    const zone = await fetchZoneForDestination(dest, code);
+    if (zone) {
+        document.getElementById('edit-zone').value = zone;
+    } else if (dest) {
+        status.innerHTML = '<span class="text-warning">Could not auto-detect zone for this destination — please select it manually.</span>';
+    }
+    clearTimeout(editRateTimer);
+    editRateTimer = setTimeout(recalcEditAmount, 150);
+});
+
+// Recalc while typing weight (slightly longer debounce)
+document.getElementById('edit-weight').addEventListener('input', () => {
+    clearTimeout(editRateTimer);
+    editRateTimer = setTimeout(recalcEditAmount, 400);
+});
+
+document.getElementById('edit-save-btn').addEventListener('click', async () => {
+    const id        = document.getElementById('edit-id').value;
+    const statusDiv = document.getElementById('edit-status');
+    const saveBtn   = document.getElementById('edit-save-btn');
+
+    const autoAmt = parseFloat(document.getElementById('edit-auto-amount').value || 0);
+    if (autoAmt > 999999 || autoAmt < 0) {
+        statusDiv.innerHTML =
+            `<span class="text-danger">Amount ₹${autoAmt.toLocaleString('en-IN')} is out of range — check Weight and Zone.</span>`;
+        return;
+    }
+
+    const payload = {
+        code:          document.getElementById('edit-code').value,
+        code_fullform: document.getElementById('edit-code-fullform').value,
+        booking_date:  document.getElementById('edit-date').value,
+        awb_no:        document.getElementById('edit-awb').value,
+        destination:   document.getElementById('edit-dest').value,
+        weight:        document.getElementById('edit-weight').value,
+        courier:       document.getElementById('edit-courier').value,
+        zone:          document.getElementById('edit-zone').value,
+        auto_amount:   document.getElementById('edit-auto-amount').value,
+    };
+
+    statusDiv.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving...';
+    saveBtn.disabled = true;
+    try {
+        const res  = await fetch(`/day-book/update/${id}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) {
+            statusDiv.innerHTML = `<span class="text-danger">${escapeHtml(data.message || `Update failed (HTTP ${res.status})`)}</span>`;
+            return;
+        }
+        hideModal('editBookingModal');
+        fetchAndUpdate();
+    } catch (err) {
+        console.error(err);
+        statusDiv.innerHTML = '<span class="text-danger">Failed to save changes. See console for details.</span>';
+    } finally {
+        saveBtn.disabled = false;
+    }
+});
+
+async function deleteRow(id) {
+    if (!confirm('Delete this booking? This cannot be undone.')) return;
+    try {
+        const res  = await fetch(`/day-book/delete/${id}`, { method: 'POST' });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.success) {
+            alert(data.message || `Failed to delete (HTTP ${res.status}).`);
+            return;
+        }
+        fetchAndUpdate();
+    } catch (err) {
+        console.error(err);
+        alert('Failed to delete. See console for details.');
+    }
+}
+
+// ---- Modal helpers ----
+function showModal(id) {
+    if (typeof bootstrap === 'undefined' || !bootstrap.Modal) {
+        alert('Bootstrap JS is missing from the page. Please reload.');
+        return;
+    }
+    bootstrap.Modal.getOrCreateInstance(document.getElementById(id)).show();
+}
+function hideModal(id) {
+    if (typeof bootstrap === 'undefined' || !bootstrap.Modal) return;
+    const inst = bootstrap.Modal.getInstance(document.getElementById(id));
+    if (inst) inst.hide();
+}
+
+// ============================================================
+// IMPORT EXCEL
+// ============================================================
+const importModalEl     = document.getElementById('importModal');
+const importFileInput   = document.getElementById('import-file');
+const importStatusDiv   = document.getElementById('import-status');
+const importPreviewBody = document.getElementById('import-preview-body');
+const importPreviewBtn  = document.getElementById('import-preview-btn');
+const importSaveBtn     = document.getElementById('import-save-btn');
+const importDiscardBtn  = document.getElementById('import-discard-btn');
+
+let importPreviewRows = [];
+let editingRowId      = null;
+
+const ZONE_OPTIONS = [1, 2, 3, 4, 5];
+
+document.getElementById('import-trigger-btn').addEventListener('click', () => showModal('importModal'));
+
+importModalEl.addEventListener('show.bs.modal', () => {
+    importFileInput.value       = '';
+    importStatusDiv.innerHTML   = '';
+    importPreviewBody.innerHTML = '';
+    importSaveBtn.style.display    = 'none';
+    importDiscardBtn.style.display = 'none';
+    importPreviewRows = [];
+    editingRowId      = null;
+});
+
+importPreviewBtn.addEventListener('click', async () => {
+    if (!importFileInput.files.length) {
+        alert('Please choose an Excel file first.');
+        return;
+    }
+    const formData = new FormData();
+    formData.append('excel_file', importFileInput.files[0]);
+
+    importStatusDiv.innerHTML      = '<i class="fa fa-spinner fa-spin"></i> Reading file...';
+    importSaveBtn.style.display    = 'none';
+    importDiscardBtn.style.display = 'none';
+    importPreviewBody.innerHTML    = '';
+    importPreviewBtn.disabled      = true;
+    editingRowId                   = null;
+
+    try {
+        const res = await fetch('/booking-import', { method: 'POST', body: formData });
+        if (!res.ok) {
+            let detail = '';
+            try { detail = (await res.json()).error || ''; } catch { detail = await res.text(); }
+            importStatusDiv.innerHTML =
+                `<span class="text-danger">Import failed (HTTP ${res.status}): ${escapeHtml(detail.slice(0, 300))}</span>`;
+            return;
+        }
+        const data = await res.json();
+        if (data.error) {
+            importStatusDiv.innerHTML = `<span class="text-danger">${escapeHtml(data.error)}</span>`;
+            return;
+        }
+        importPreviewRows = data.rows || [];
+        renderImportPreview();
+    } catch (err) {
+        console.error(err);
+        importStatusDiv.innerHTML = '<span class="text-danger">Failed to read file. See browser console.</span>';
+    } finally {
+        importPreviewBtn.disabled = false;
+    }
+});
+
+// Amount to show in preview — prefer total_amount from file, else auto_amount
+function displayAmount(r) {
+    if (r.total_amount != null && r.total_amount > 0) return parseFloat(r.total_amount).toFixed(2);
+    return parseFloat(r.auto_amount || 0).toFixed(2);
+}
+
+function renderImportPreview() {
+    const rows        = importPreviewRows;
+    const validCount  = rows.filter(r => r.valid).length;
+    const invalidCount = rows.length - validCount;
+
+    importStatusDiv.innerHTML =
+        `<span class="text-success">${validCount} ready to import</span>` +
+        (invalidCount ? ` &nbsp;|&nbsp; <span class="text-danger">${invalidCount} row(s) need fixing</span>` : '');
+
+    importPreviewBody.innerHTML = rows.length
+        ? rows.map(r => (String(r.temp_id) === String(editingRowId))
+            ? buildEditRowHtml(r) : buildDisplayRowHtml(r)).join('')
+        : '<tr><td colspan="11" class="text-center">No rows found in file</td></tr>';
+
+    importSaveBtn.style.display    = validCount  ? 'inline-block' : 'none';
+    importDiscardBtn.style.display = rows.length ? 'inline-block' : 'none';
+}
+
+function buildDisplayRowHtml(r) {
+    const editBtn = `
+        <button type="button" class="btn btn-sm btn-outline-primary import-edit-btn"
+                data-temp-id="${r.temp_id}" title="${r.valid ? 'Edit' : 'Fix row'}">
+            <i class="fa fa-pen"></i>
+        </button>`;
+    if (r.valid) {
+        return `<tr data-temp-id="${r.temp_id}">
+            <td>${r.temp_id}</td>
+            <td>${escapeHtml(r.code)}</td>
+            <td>${escapeHtml(r.booking_date)}</td>
+            <td>${escapeHtml(r.awb_no)}</td>
+            <td>${escapeHtml(r.destination)}</td>
+            <td>${parseFloat(r.weight || 0).toFixed(3)}</td>
+            <td>${displayAmount(r)}</td>
+            <td>${r.zone}</td>
+            <td>${escapeHtml(r.courier)}</td>
+            <td><span class="badge bg-success">OK</span></td>
+            <td class="text-center">${editBtn}</td>
+        </tr>`;
+    }
+    return `<tr class="table-danger" data-temp-id="${r.temp_id}">
+        <td>${r.temp_id}</td>
+        <td colspan="8">${escapeHtml(r.error || 'Invalid row')}</td>
+        <td><span class="badge bg-danger">Error</span></td>
+        <td class="text-center">${editBtn}</td>
+    </tr>`;
+}
+
+function buildEditRowHtml(r) {
+    const currentZone = r.zone || 5;
+    const zoneOptions = ZONE_OPTIONS.map(z =>
+        `<option value="${z}" ${String(currentZone) === String(z) ? 'selected' : ''}>${z}</option>`
+    ).join('');
+    const amountVal = (r.total_amount != null && r.total_amount > 0) ? r.total_amount : (r.auto_amount || '');
+    return `<tr data-temp-id="${r.temp_id}" class="table-warning">
+        <td>${r.temp_id}</td>
+        <td><input type="text" class="form-control form-control-sm imp-edit-code" value="${escapeHtml(r.code || '')}" placeholder="Code"></td>
+        <td><input type="date" class="form-control form-control-sm imp-edit-date" value="${escapeHtml(r.booking_date || '')}"></td>
+        <td><input type="text" class="form-control form-control-sm imp-edit-awb" value="${escapeHtml(r.awb_no || '')}" placeholder="AWB No"></td>
+        <td><input type="text" class="form-control form-control-sm imp-edit-dest" value="${escapeHtml(r.destination || '')}" placeholder="Destination"></td>
+        <td><input type="number" step="0.01" class="form-control form-control-sm imp-edit-weight" value="${r.weight || ''}" placeholder="Weight"></td>
+        <td><input type="number" step="0.01" class="form-control form-control-sm imp-edit-amount" value="${amountVal}" placeholder="Amount"></td>
+        <td><select class="form-select form-select-sm imp-edit-zone">${zoneOptions}</select></td>
+        <td><input type="text" class="form-control form-control-sm imp-edit-courier" value="${escapeHtml(r.courier || 'ST COURIER')}"></td>
+        <td><span class="badge bg-warning text-dark">Editing</span></td>
+        <td class="text-center text-nowrap">
+            <button type="button" class="btn btn-sm btn-success import-update-btn" data-temp-id="${r.temp_id}" title="Update">
+                <i class="fa fa-check"></i>
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary import-cancel-btn" data-temp-id="${r.temp_id}" title="Cancel">
+                <i class="fa fa-times"></i>
+            </button>
+        </td>
+    </tr>`;
+}
+
+importPreviewBody.addEventListener('click', (e) => {
+    const editBtn = e.target.closest('.import-edit-btn');
+    if (editBtn)   { editingRowId = editBtn.dataset.tempId; renderImportPreview(); return; }
+
+    const cancelBtn = e.target.closest('.import-cancel-btn');
+    if (cancelBtn) { editingRowId = null; renderImportPreview(); return; }
+
+    const updateBtn = e.target.closest('.import-update-btn');
+    if (updateBtn) { applyRowUpdate(updateBtn.dataset.tempId); return; }
+});
+
+async function applyRowUpdate(tempId) {
+    const tr = importPreviewBody.querySelector(`tr[data-temp-id="${tempId}"]`);
+    if (!tr) return;
+
+    const code         = tr.querySelector('.imp-edit-code').value.trim().toUpperCase();
+    const bookingDate  = tr.querySelector('.imp-edit-date').value;
+    const awb          = tr.querySelector('.imp-edit-awb').value.trim();
+    const dest         = tr.querySelector('.imp-edit-dest').value.trim().toUpperCase();
+    const weight       = parseFloat(tr.querySelector('.imp-edit-weight').value);
+    const zone         = parseInt(tr.querySelector('.imp-edit-zone').value, 10);
+    const courier      = tr.querySelector('.imp-edit-courier').value.trim() || 'ST COURIER';
+    const amountField  = tr.querySelector('.imp-edit-amount').value.trim();
+    const manualAmount = amountField === '' ? null : parseFloat(amountField);
+
+    if (!code || !bookingDate || !awb || !dest || !weight || weight <= 0) {
+        alert('Code, Date, AWB, Destination and a valid Weight are all required.');
+        return;
+    }
+    if (manualAmount !== null && isNaN(manualAmount)) {
+        alert('Amount must be a number.');
+        return;
+    }
+
+    const row = importPreviewRows.find(r => String(r.temp_id) === String(tempId));
+    if (!row) return;
+
+    const updateBtn = tr.querySelector('.import-update-btn');
+    updateBtn.disabled = true;
+    updateBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+
+    let autoAmount   = manualAmount;
+    let codeFullform = row.code_fullform || '';
+    try {
+        const res     = await fetch(`/api/rate/lookup?code=${encodeURIComponent(code)}&zone=${zone}`);
+        const rateRow = await res.json();
+        if (rateRow && rateRow.code_fullform) codeFullform = rateRow.code_fullform;
+        if (autoAmount === null) {
+            autoAmount = (rateRow && Object.keys(rateRow).length) ? computeAutoAmount(rateRow, weight) : 0;
+        }
+    } catch (err) {
+        console.error(err);
+        if (autoAmount === null) autoAmount = 0;
+    }
+
+    Object.assign(row, {
+        code, code_fullform: codeFullform, booking_date: bookingDate,
+        awb_no: awb, destination: dest, weight, zone, courier,
+        auto_amount: autoAmount,
+        fuel: null,
+        total_amount: null,
+        valid: true, error: null
+    });
+
+    editingRowId = null;
+    renderImportPreview();
+}
+
+importDiscardBtn.addEventListener('click', () => {
+    if (!confirm('Discard the loaded preview?')) return;
+    importPreviewRows          = [];
+    editingRowId               = null;
+    importFileInput.value      = '';
+    importStatusDiv.innerHTML  = '';
+    importPreviewBody.innerHTML = '';
+    importSaveBtn.style.display    = 'none';
+    importDiscardBtn.style.display = 'none';
+});
+
+importSaveBtn.addEventListener('click', async () => {
+    if (!importPreviewRows.length) return;
+
+    importStatusDiv.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving...';
+    importSaveBtn.disabled    = true;
+
+    try {
+        const res = await fetch('/booking-import-save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rows: importPreviewRows })
+        });
+        if (!res.ok) {
+            const text = await res.text();
+            importStatusDiv.innerHTML =
+                `<span class="text-danger">Save failed (HTTP ${res.status}): ${escapeHtml(text.slice(0, 300))}</span>`;
+            return;
+        }
+        const data = await res.json();
+        if (data.success) {
+            importStatusDiv.innerHTML =
+                `<span class="text-success">Imported ${data.inserted} row(s).</span>` +
+                (data.errors && data.errors.length
+                    ? `<br><span class="text-warning">${data.errors.length} skipped — see below.</span>` : '');
+            importSaveBtn.style.display    = 'none';
+            importDiscardBtn.style.display = 'none';
+            importPreviewRows = [];
+            fetchAndUpdate();
+        } else {
+            importStatusDiv.innerHTML = `<span class="text-danger">${escapeHtml(data.message || 'Import failed')}</span>`;
+        }
+    } catch (err) {
+        console.error(err);
+        importStatusDiv.innerHTML = '<span class="text-danger">Failed to save import. See browser console.</span>';
+    } finally {
+        importSaveBtn.disabled = false;
+    }
+});
+
+// ── Do NOT auto-load on page open — wait for Filter button click ──
+</script>
+
+<style>
+#table-loading {
+    background: rgba(255,255,255,0.8);
+    position: absolute;
+    width: calc(100% - 2rem);
+    z-index: 10;
+}
+.card.p-3 { position: relative; }
+
+.filter-row th {
+    padding: 4px 6px;
+    background: #212529;
+    border-top: 1px solid rgba(255,255,255,0.15);
+}
+.filter-row input.col-filter {
+    background: #2c3034;
+    border: 1px solid #495057;
+    color: #fff;
+    font-weight: normal;
+}
+.filter-row input.col-filter::placeholder { color: #adb5bd; }
+.filter-row input.col-filter:focus {
+    background: #343a40;
+    border-color: #0d6efd;
+    color: #fff;
+    box-shadow: 0 0 0 0.2rem rgba(13,110,253,.25);
+}
+
+</style>
+
+{% endblock %}

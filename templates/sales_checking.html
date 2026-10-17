@@ -1,0 +1,142 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<h4>Sales Checking</h4>
+
+<form method="post" class="card p-3 mb-3" id="salesForm">
+<div class="row g-2">
+<div class="col-md-3">
+    <label>Date</label>
+    <input type="date" name="date" id="date" class="form-control" value="{{ filters.date or '' }}">
+</div>
+<div class="col-md-2 d-flex align-items-end">
+    <button type="submit" class="btn btn-primary btn-sm w-100" id="toggleBtn">
+        <i class="fa fa-search"></i> Show Data
+    </button>
+</div>
+</div>
+</form>
+
+<!-- Results container -->
+<div id="resultsContainer" {% if not show_results %}style="display:none;"{% endif %}>
+    <div class="d-flex gap-2 mb-2">
+        <button class="btn btn-success btn-sm" onclick="exportSalesExcel()">
+            <i class="fa fa-file-excel"></i> Export to Excel
+        </button>
+        <button class="btn btn-danger btn-sm" onclick="exportSalesPDF()">
+            <i class="fa fa-file-pdf"></i> Export to PDF
+        </button>
+    </div>
+
+    <div class="card p-3">
+        <table class="table table-bordered table-sm">
+            <thead class="table-dark">
+                <tr>
+                    <th>SNO</th>
+                    <th>Client Code</th>
+                    <th>Company Name</th>
+                    <th>AWB No</th>
+                    <th>Destination</th>
+                    <th>Sum</th>
+                    <th class="text-end">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in rows %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ r.code }}</td>
+                    <td>{{ r.code_fullform }}</td>
+                    <td>{{ r.awb_no }}</td>
+                    <td>{{ r.destination }}</td>
+                    <td>{{ r.sum_count }}</td>
+                    <td class="text-end">{{ r.amount }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" class="text-center">No Records Found</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <h6 class="text-end mt-2">
+            <strong>Total Amount: {{ total_amount }}</strong>
+        </h6>
+    </div>
+</div>
+
+<script>
+const toggleBtn  = document.getElementById('toggleBtn');
+const resultsDiv = document.getElementById('resultsContainer');
+const filterInputs = ['date'].map(id => document.getElementById(id));
+
+function setShowDataMode() {
+    toggleBtn.innerHTML = '<i class="fa fa-search"></i> Show Data';
+    toggleBtn.classList.remove('btn-secondary');
+    toggleBtn.classList.add('btn-primary');
+    toggleBtn.dataset.mode = 'show';
+}
+
+function setHideDataMode() {
+    toggleBtn.innerHTML = '<i class="fa fa-eye-slash"></i> Hide Data';
+    toggleBtn.classList.remove('btn-primary');
+    toggleBtn.classList.add('btn-secondary');
+    toggleBtn.dataset.mode = 'hide';
+}
+
+if (resultsDiv.style.display !== 'none') {
+    setHideDataMode();
+} else {
+    setShowDataMode();
+}
+
+function onFilterChange() {
+    if (toggleBtn.dataset.mode === 'hide') {
+        setShowDataMode();
+        resultsDiv.style.display = 'none';
+    }
+}
+
+filterInputs.forEach(input => {
+    if (input) input.addEventListener('input',  onFilterChange);
+    if (input) input.addEventListener('change', onFilterChange);
+});
+
+toggleBtn.addEventListener('click', function(e) {
+    if (toggleBtn.dataset.mode === 'show') {
+        return;
+    } else {
+        e.preventDefault();
+        if (resultsDiv.style.display === 'none') {
+            resultsDiv.style.display = 'block';
+            setHideDataMode();
+        } else {
+            resultsDiv.style.display = 'none';
+            setShowDataMode();
+        }
+    }
+});
+
+function getSalesFormData() {
+    const fd = new FormData();
+    fd.append('date',        '{{ filters.date        or "" }}');
+    fd.append('client_code', '{{ filters.client_code or "" }}');
+    fd.append('awb_no',      '{{ filters.awb_no      or "" }}');
+    fd.append('destination', '{{ filters.destination or "" }}');
+    return fd;
+}
+
+function exportSalesExcel() {
+    fetch('/sales-export', { method: 'POST', body: getSalesFormData() })
+        .then(r => r.json())
+        .then(d => { if (d.status === 'ok') alert('Excel file opened!'); })
+        .catch(e => alert('Export error: ' + e));
+}
+
+function exportSalesPDF() {
+    fetch('/sales-pdf', { method: 'POST', body: getSalesFormData() })
+        .then(r => r.json())
+        .then(d => { if (d.status === 'ok') alert('PDF file opened!'); })
+        .catch(e => alert('PDF error: ' + e));
+}
+</script>
+
+{% endblock %}

@@ -1,0 +1,913 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<style>
+/* ── Design tokens ─────────────────────────────────────────── */
+:root {
+  --ink:      #0f1923;
+  --ink2:     #3a4a58;
+  --muted:    #7a8fa0;
+  --border:   #dde4ea;
+  --surface:  #f5f8fb;
+  --white:    #ffffff;
+  --brand:    #c0392b;        /* courier red */
+  --brand2:   #e74c3c;
+  --green:    #1a9e6e;
+  --amber:    #d4850a;
+  --blue:     #1565c0;
+  --card-sh:  0 2px 12px rgba(15,25,35,.08);
+}
+
+/* ── Reset / base ──────────────────────────────────────────── */
+.db-wrap * { box-sizing: border-box; margin: 0; padding: 0; }
+.db-wrap {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  color: var(--ink);
+  background: var(--surface);
+  min-height: 100vh;
+  padding: 28px 24px 48px;
+}
+
+/* ── Page header ───────────────────────────────────────────── */
+.db-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.db-header-left h2 {
+  font-size: 1.55rem;
+  font-weight: 700;
+  letter-spacing: -.3px;
+  color: var(--ink);
+}
+.db-header-left span {
+  font-size: .82rem;
+  color: var(--muted);
+  display: block;
+  margin-top: 2px;
+}
+.db-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.db-date-badge {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: .82rem;
+  color: var(--ink2);
+  font-weight: 500;
+  box-shadow: var(--card-sh);
+}
+.db-refresh-btn {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 38px; height: 38px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--card-sh);
+  color: var(--ink2);
+  transition: all .15s;
+}
+.db-refresh-btn:hover { background: var(--brand); color: #fff; border-color: var(--brand); }
+.db-refresh-btn.spinning i { animation: spin .7s linear infinite; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+/* ── KPI strip ─────────────────────────────────────────────── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+@media (max-width: 900px) { .kpi-grid { grid-template-columns: repeat(2,1fr); } }
+@media (max-width: 500px) { .kpi-grid { grid-template-columns: 1fr; } }
+
+.kpi-card {
+  background: var(--white);
+  border-radius: 12px;
+  padding: 20px 22px;
+  box-shadow: var(--card-sh);
+  border-left: 4px solid transparent;
+  position: relative;
+  overflow: hidden;
+  transition: transform .15s, box-shadow .15s;
+  cursor: default;
+}
+.kpi-card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(15,25,35,.14); }
+.kpi-card.red   { border-color: var(--brand); }
+.kpi-card.green { border-color: var(--green); }
+.kpi-card.amber { border-color: var(--amber); }
+.kpi-card.blue  { border-color: var(--blue);  }
+
+.kpi-label {
+  font-size: .73rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .7px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.kpi-value {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ink);
+  letter-spacing: -.5px;
+}
+.kpi-value .kpi-unit {
+  font-size: .95rem;
+  font-weight: 500;
+  color: var(--ink2);
+  margin-left: 2px;
+}
+.kpi-sub {
+  font-size: .76rem;
+  color: var(--muted);
+  margin-top: 6px;
+}
+.kpi-sub b { color: var(--ink2); }
+.kpi-icon {
+  position: absolute;
+  right: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 2.4rem;
+  opacity: .08;
+  transition: transform .3s;
+}
+.kpi-card:hover .kpi-icon { transform: translateY(-50%) scale(1.15) rotate(-6deg); opacity: .14; }
+
+/* ── Two-column row ────────────────────────────────────────── */
+.db-row {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.db-row-2 { grid-template-columns: 1fr 1fr; }
+.db-row-3 { grid-template-columns: 2fr 1fr; }
+@media (max-width: 860px) {
+  .db-row-2, .db-row-3 { grid-template-columns: 1fr; }
+}
+
+/* ── Panel ─────────────────────────────────────────────────── */
+.panel {
+  background: var(--white);
+  border-radius: 12px;
+  box-shadow: var(--card-sh);
+  overflow: hidden;
+}
+.panel-head {
+  padding: 16px 20px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.panel-head h4 {
+  font-size: .88rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--ink2);
+}
+.panel-head a {
+  font-size: .78rem;
+  color: var(--brand);
+  text-decoration: none;
+  font-weight: 600;
+}
+.panel-body { padding: 16px 20px; }
+
+/* ── Chart toggle buttons ──────────────────────────────────── */
+.chart-toggle {
+  display: flex;
+  gap: 4px;
+  background: var(--surface);
+  padding: 3px;
+  border-radius: 8px;
+}
+.toggle-btn {
+  border: none;
+  background: transparent;
+  padding: 5px 12px;
+  font-size: .72rem;
+  font-weight: 600;
+  color: var(--muted);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.toggle-btn:hover { color: var(--ink2); }
+.toggle-btn.active {
+  background: var(--white);
+  color: var(--brand);
+  box-shadow: 0 1px 4px rgba(15,25,35,.12);
+}
+
+/* ── 6-month chart ─────────────────────────────────────────── */
+.chart-container { position: relative; }
+#six-month-chart { width: 100%; display: block; cursor: crosshair; }
+.chart-tooltip {
+  position: absolute;
+  display: none;
+  background: var(--ink);
+  color: #fff;
+  padding: 7px 11px;
+  border-radius: 7px;
+  font-size: .74rem;
+  line-height: 1.4;
+  pointer-events: none;
+  transform: translate(-50%, -115%);
+  white-space: nowrap;
+  z-index: 20;
+  box-shadow: 0 4px 14px rgba(0,0,0,.25);
+}
+.chart-tooltip b { color: #ffd6d0; }
+.chart-summary {
+  display: flex;
+  gap: 22px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border);
+  flex-wrap: wrap;
+}
+.chart-summary-item { font-size: .78rem; color: var(--ink2); }
+.chart-summary-item b { display: block; font-size: 1.05rem; color: var(--ink); margin-top: 2px; }
+.trend-pill {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: .7rem; font-weight: 700; padding: 1px 7px;
+  border-radius: 10px; margin-left: 6px;
+}
+.trend-pill.up   { background: #e3f8ef; color: #0f7a52; }
+.trend-pill.down { background: #fde8e8; color: #b91c1c; }
+
+/* ── Bar chart ─────────────────────────────────────────────── */
+.bar-chart { display: flex; flex-direction: column; gap: 11px; }
+.bar-row { display: grid; grid-template-columns: 90px 1fr 64px; align-items: center; gap: 10px; cursor: default; }
+.bar-label { font-size: .78rem; color: var(--ink2); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar-track { background: var(--surface); border-radius: 4px; height: 10px; overflow: hidden; position: relative; }
+.bar-fill  { height: 100%; border-radius: 4px; background: var(--brand); transition: width .8s cubic-bezier(.22,1,.36,1); width: 0; }
+.bar-fill.green { background: var(--green); }
+.bar-fill.amber { background: var(--amber); }
+.bar-fill.blue  { background: var(--blue);  }
+.bar-val   { font-size: .78rem; color: var(--ink2); font-weight: 600; text-align: right; }
+.bar-row:hover .bar-track { transform: scaleY(1.3); }
+.bar-track { transition: transform .15s; }
+
+/* ── Zone donut ────────────────────────────────────────────── */
+.donut-wrap { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+.donut-legend { flex: 1; min-width: 130px; }
+.donut-legend-item {
+  display: flex; align-items: center; gap: 8px;
+  font-size: .78rem; color: var(--ink2); margin-bottom: 8px;
+  padding: 3px 6px; border-radius: 6px; cursor: default;
+  transition: background .15s;
+}
+.donut-legend-item:hover { background: var(--surface); }
+.dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+#zone-donut { cursor: pointer; }
+
+/* ── Recent bookings table ─────────────────────────────────── */
+.mini-table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+.mini-table th {
+  text-align: left; padding: 6px 10px;
+  font-size: .69rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .5px;
+  color: var(--muted); border-bottom: 1px solid var(--border);
+}
+.mini-table td { padding: 9px 10px; border-bottom: 1px solid var(--surface); color: var(--ink2); vertical-align: middle; }
+.mini-table tr:last-child td { border-bottom: none; }
+.mini-table tr:hover td { background: var(--surface); }
+.badge-zone {
+  display: inline-block; padding: 2px 8px; border-radius: 20px;
+  font-size: .68rem; font-weight: 700;
+}
+.z1 { background:#fde8e8; color:#b91c1c; }
+.z2 { background:#fef3c7; color:#92400e; }
+.z3 { background:#d1fae5; color:#065f46; }
+.z4 { background:#dbeafe; color:#1e40af; }
+.z5 { background:#ede9fe; color:#5b21b6; }
+
+/* ── Skeleton loader ───────────────────────────────────────── */
+.skel {
+  background: linear-gradient(90deg, #e8edf2 25%, #f5f8fb 50%, #e8edf2 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: 6px;
+}
+@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+.skel-text  { height: 14px; margin-bottom: 8px; }
+.skel-value { height: 32px; width: 60%; margin-bottom: 6px; }
+.skel-bar   { height: 10px; margin-bottom: 11px; }
+
+/* ── Quick links ───────────────────────────────────────────── */
+.quick-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding: 16px 20px;
+}
+.quick-btn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 6px; padding: 16px 8px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; text-decoration: none; color: var(--ink2);
+  font-size: .75rem; font-weight: 600; text-align: center;
+  transition: all .15s;
+}
+.quick-btn:hover { background: var(--brand); color: #fff; border-color: var(--brand); transform: translateY(-2px); }
+.quick-btn i { font-size: 1.35rem; }
+
+/* ── Pulse dot ─────────────────────────────────────────────── */
+.live-dot {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--green); margin-right: 6px;
+  box-shadow: 0 0 0 0 rgba(26,158,110,.4);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(26,158,110,.4); }
+  70%  { box-shadow: 0 0 0 8px rgba(26,158,110,0); }
+  100% { box-shadow: 0 0 0 0 rgba(26,158,110,0); }
+}
+
+/* ── Fade-in on load ───────────────────────────────────────── */
+.panel, .kpi-card { animation: fadeUp .4s ease both; }
+.db-row-3 .panel:nth-child(2) { animation-delay: .05s; }
+.db-row-2 .panel:nth-child(2) { animation-delay: .05s; }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+</style>
+
+<div class="db-wrap">
+
+  <!-- Header -->
+  <div class="db-header">
+    <div class="db-header-left">
+      <h2>📦 Operations Dashboard</h2>
+      <span><span class="live-dot"></span>Live data · ST Courier System</span>
+    </div>
+    <div class="db-header-right">
+      <div class="db-date-badge" id="db-clock">—</div>
+      <button class="db-refresh-btn" id="db-refresh-btn" title="Refresh dashboard">
+        <i class="fa fa-rotate-right"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- KPI strip -->
+  <div class="kpi-grid" id="kpi-grid">
+    <!-- Rendered by JS -->
+    <div class="kpi-card red">
+      <div class="kpi-label">Today's Bookings</div>
+      <div class="skel skel-value"></div>
+      <div class="skel skel-text" style="width:55%"></div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-label">Today's Revenue</div>
+      <div class="skel skel-value"></div>
+      <div class="skel skel-text" style="width:45%"></div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-label">This Month</div>
+      <div class="skel skel-value"></div>
+      <div class="skel skel-text" style="width:60%"></div>
+    </div>
+    <div class="kpi-card blue">
+      <div class="kpi-label">Total Records</div>
+      <div class="skel skel-value"></div>
+      <div class="skel skel-text" style="width:50%"></div>
+    </div>
+  </div>
+
+  <!-- 6-Month Trend -->
+  <div class="panel" style="margin-bottom:24px">
+    <div class="panel-head">
+      <h4>📈 6-Month Trend</h4>
+      <div class="chart-toggle" id="chart-toggle">
+        <button class="toggle-btn active" data-metric="revenue">Revenue</button>
+        <button class="toggle-btn" data-metric="count">Bookings</button>
+        <button class="toggle-btn" data-metric="weight">Weight</button>
+      </div>
+    </div>
+    <div class="panel-body">
+      <div class="chart-container">
+        <canvas id="six-month-chart" height="230"></canvas>
+        <div class="chart-tooltip" id="chart-tooltip"></div>
+      </div>
+      <div class="chart-summary" id="chart-summary">
+        <div class="skel skel-text" style="width:120px"></div>
+        <div class="skel skel-text" style="width:120px"></div>
+        <div class="skel skel-text" style="width:120px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row: Daily trend + Zone split -->
+  <div class="db-row db-row-3">
+
+    <!-- Daily trend (last 7 days) -->
+    <div class="panel">
+      <div class="panel-head">
+        <h4>📅 Last 7 Days — Revenue</h4>
+        <a href="/day-wise">View all →</a>
+      </div>
+      <div class="panel-body">
+        <div class="bar-chart" id="trend-chart">
+          {% for i in range(7) %}
+          <div class="bar-row">
+            <div class="skel skel-text"></div>
+            <div class="bar-track"><div class="skel skel-bar" style="border-radius:4px;height:10px;margin:0"></div></div>
+            <div class="skel skel-text" style="width:50px"></div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Zone split donut -->
+    <div class="panel">
+      <div class="panel-head">
+        <h4>🗺️ Zone Split</h4>
+      </div>
+      <div class="panel-body">
+        <div class="donut-wrap">
+          <canvas id="zone-donut" width="120" height="120" style="flex-shrink:0"></canvas>
+          <div class="donut-legend" id="zone-legend">
+            <div class="skel skel-text"></div>
+            <div class="skel skel-text"></div>
+            <div class="skel skel-text"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Row: Top clients + Recent bookings -->
+  <div class="db-row db-row-2">
+
+    <!-- Top clients by revenue -->
+    <div class="panel">
+      <div class="panel-head">
+        <h4>🏆 Top Clients — This Month</h4>
+        <a href="/invoice">Invoice →</a>
+      </div>
+      <div class="panel-body">
+        <div class="bar-chart" id="client-chart">
+          {% for i in range(5) %}
+          <div class="bar-row">
+            <div class="skel skel-text"></div>
+            <div class="bar-track"><div class="skel skel-bar" style="border-radius:4px;height:10px;margin:0"></div></div>
+            <div class="skel skel-text" style="width:50px"></div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick links -->
+    <div class="panel">
+      <div class="panel-head"><h4>⚡ Quick Access</h4></div>
+      <div class="quick-grid">
+        <a class="quick-btn" href="/booking-entry"><i class="fa fa-plus-circle"></i>New Booking</a>
+        <a class="quick-btn" href="/day-book"><i class="fa fa-book"></i>Day Book</a>
+        <a class="quick-btn" href="/invoice"><i class="fa fa-file-invoice"></i>Invoice</a>
+        <a class="quick-btn" href="/sales-checking"><i class="fa fa-search"></i>Sales Check</a>
+        <a class="quick-btn" href="/rate-entry"><i class="fa fa-tags"></i>Rates</a>
+        <a class="quick-btn" href="/zone-entry"><i class="fa fa-map-marker"></i>Zones</a>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Recent bookings -->
+  <div class="panel" style="margin-bottom:8px">
+    <div class="panel-head">
+      <h4>🕐 Recent Bookings</h4>
+      <a href="/day-book">Day Book →</a>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="mini-table" id="recent-table">
+        <thead>
+          <tr>
+            <th>#</th><th>Code</th><th>Company</th><th>AWB</th>
+            <th>Destination</th><th>Wt (kg)</th><th>Zone</th><th>Amount</th>
+          </tr>
+        </thead>
+        <tbody id="recent-tbody">
+          {% for i in range(8) %}
+          <tr>
+            <td colspan="8"><div class="skel skel-text" style="margin:0"></div></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /db-wrap -->
+
+<script>
+// ── Clock ────────────────────────────────────────────────────
+(function clock() {
+  const el = document.getElementById('db-clock');
+  function tick() {
+    const now = new Date();
+    el.textContent = now.toLocaleDateString('en-IN', {
+      weekday:'short', day:'2-digit', month:'short', year:'numeric'
+    }) + ' · ' + now.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' });
+  }
+  tick(); setInterval(tick, 60000);
+})();
+
+// ── Colours ──────────────────────────────────────────────────
+const ZONE_COLORS = ['#c0392b','#d4850a','#1a9e6e','#1565c0','#7c3aed'];
+const ZONE_NAMES  = ['Chennai','Tamil Nadu','South India','North Metro','ROI'];
+const BAR_COLORS  = ['red','amber','green','blue','red'];
+
+// ── Helpers ──────────────────────────────────────────────────
+function fmt(n)   { return Number(n||0).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+function fmtK(n)  {
+  n = Number(n||0);
+  if (n >= 100000) return '₹' + (n/100000).toFixed(1) + 'L';
+  if (n >= 1000)   return '₹' + (n/1000).toFixed(1) + 'K';
+  return '₹' + fmt(n);
+}
+function escHtml(s) {
+  return String(s||'').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+}
+
+// ── Animated count-up for KPI numbers ───────────────────────
+function animateValue(el, endVal, opts={}) {
+  const isMoney  = !!opts.money;
+  const decimals = opts.decimals ?? 0;
+  const duration = 700;
+  const startVal = 0;
+  const startTime = performance.now();
+  function step(now) {
+    const p = Math.min((now - startTime) / duration, 1);
+    const eased = 1 - Math.pow(1 - p, 3);
+    const val = startVal + (endVal - startVal) * eased;
+    el.textContent = isMoney ? fmt(val) : (decimals ? val.toFixed(decimals) : Math.round(val).toLocaleString('en-IN'));
+    if (p < 1) requestAnimationFrame(step);
+    else el.textContent = isMoney ? fmt(endVal) : (decimals ? endVal.toFixed(decimals) : Math.round(endVal).toLocaleString('en-IN'));
+  }
+  requestAnimationFrame(step);
+}
+
+// ── Donut canvas ─────────────────────────────────────────────
+function drawDonut(canvas, slices) {
+  const ctx = canvas.getContext('2d');
+  const cx = 60, cy = 60, r = 48, inner = 28;
+  const total = slices.reduce((a,s) => a + s.val, 0);
+  let angle = -Math.PI / 2;
+  ctx.clearRect(0, 0, 120, 120);
+  if (!total) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI*2);
+    ctx.arc(cx, cy, inner, 0, Math.PI*2, true);
+    ctx.fillStyle = '#dde4ea';
+    ctx.fill('evenodd');
+    return;
+  }
+  slices.forEach(s => {
+    const sweep = (s.val / total) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, angle, angle + sweep);
+    ctx.arc(cx, cy, inner, angle + sweep, angle, true);
+    ctx.closePath();
+    ctx.fillStyle = s.color;
+    ctx.fill();
+    angle += sweep;
+  });
+  // centre label
+  ctx.fillStyle = '#0f1923';
+  ctx.font = 'bold 13px Segoe UI,system-ui,sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(total, cx, cy);
+}
+
+// ── Build KPI cards ──────────────────────────────────────────
+function buildKpis(d) {
+  document.getElementById('kpi-grid').innerHTML = `
+    <div class="kpi-card red">
+      <div class="kpi-icon">📦</div>
+      <div class="kpi-label">Today's Bookings</div>
+      <div class="kpi-value"><span id="kv-today-count">0</span><span class="kpi-unit">pkgs</span></div>
+      <div class="kpi-sub">Wt: <b>${Number(d.today_weight||0).toFixed(3)} kg</b></div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-icon">💰</div>
+      <div class="kpi-label">Today's Revenue</div>
+      <div class="kpi-value" style="font-size:1.6rem">₹<span id="kv-today-rev">0</span></div>
+      <div class="kpi-sub">Avg: <b>₹${d.today_count ? fmt(d.today_revenue/d.today_count) : '0.00'}</b> per pkg</div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-icon">📆</div>
+      <div class="kpi-label">This Month</div>
+      <div class="kpi-value" style="font-size:1.5rem" id="kv-month-rev">${fmtK(d.month_revenue)}</div>
+      <div class="kpi-sub"><b>${d.month_count}</b> bookings · <b>${Number(d.month_weight||0).toFixed(1)} kg</b></div>
+    </div>
+    <div class="kpi-card blue">
+      <div class="kpi-icon">🗂️</div>
+      <div class="kpi-label">All-time Records</div>
+      <div class="kpi-value"><span id="kv-total-count">0</span></div>
+      <div class="kpi-sub">Total revenue: <b>${fmtK(d.total_revenue)}</b></div>
+    </div>
+  `;
+  animateValue(document.getElementById('kv-today-count'), d.today_count||0);
+  animateValue(document.getElementById('kv-today-rev'), d.today_revenue||0, {money:true});
+  animateValue(document.getElementById('kv-total-count'), d.total_count||0);
+}
+
+// ── Build 7-day trend chart ─────────────────────────────────
+function buildTrend(rows) {
+  const max = Math.max(...rows.map(r => r.revenue), 1);
+  document.getElementById('trend-chart').innerHTML = rows.map(r => `
+    <div class="bar-row" title="₹${fmt(r.revenue)}">
+      <div class="bar-label">${escHtml(r.label)}</div>
+      <div class="bar-track">
+        <div class="bar-fill" data-w="${Math.round(r.revenue/max*100)}"></div>
+      </div>
+      <div class="bar-val">₹${fmtK(r.revenue).replace('₹','')}</div>
+    </div>
+  `).join('');
+  requestAnimationFrame(() => {
+    document.querySelectorAll('#trend-chart .bar-fill').forEach(el => {
+      el.style.width = el.dataset.w + '%';
+    });
+  });
+}
+
+// ── Build client chart ────────────────────────────────────────
+function buildClients(rows) {
+  const max = Math.max(...rows.map(r => r.revenue), 1);
+  document.getElementById('client-chart').innerHTML = rows.length ? rows.map((r, i) => `
+    <div class="bar-row" title="${escHtml(r.name)} — ₹${fmt(r.revenue)}">
+      <div class="bar-label" title="${escHtml(r.name)}">${escHtml(r.code)}</div>
+      <div class="bar-track">
+        <div class="bar-fill ${BAR_COLORS[i%5]}" data-w="${Math.round(r.revenue/max*100)}"></div>
+      </div>
+      <div class="bar-val">₹${fmtK(r.revenue).replace('₹','')}</div>
+    </div>
+  `).join('') : '<div style="color:var(--muted);font-size:.82rem;text-align:center;padding:20px 0">No data for this month yet</div>';
+  requestAnimationFrame(() => {
+    document.querySelectorAll('#client-chart .bar-fill').forEach(el => {
+      el.style.width = el.dataset.w + '%';
+    });
+  });
+}
+
+// ── Build zone legend + donut ─────────────────────────────────
+function buildZone(rows) {
+  const canvas = document.getElementById('zone-donut');
+  const slices = rows.map((r,i) => ({ val: r.count, color: ZONE_COLORS[i] || '#999' }));
+  drawDonut(canvas, slices);
+
+  const total = rows.reduce((a,r) => a + r.count, 0);
+  document.getElementById('zone-legend').innerHTML = rows.map((r,i) => `
+    <div class="donut-legend-item">
+      <span class="dot" style="background:${ZONE_COLORS[i]||'#999'}"></span>
+      <span><b>${r.label}</b> — ${r.count} <span style="color:var(--muted)">(${total ? Math.round(r.count/total*100) : 0}%)</span></span>
+    </div>
+  `).join('') || '<span style="color:var(--muted);font-size:.8rem">No data</span>';
+}
+
+// ── Build recent table ────────────────────────────────────────
+const ZONE_BADGE = ['','z1','z2','z3','z4','z5'];
+function buildRecent(rows) {
+  document.getElementById('recent-tbody').innerHTML = rows.length ? rows.map((r,i) => `
+    <tr>
+      <td style="color:var(--muted)">${i+1}</td>
+      <td><b>${escHtml(r.code)}</b></td>
+      <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(r.code_fullform)}">${escHtml(r.code_fullform||'—')}</td>
+      <td style="font-family:monospace;font-size:.77rem">${escHtml(r.awb_no)}</td>
+      <td>${escHtml(r.destination)}</td>
+      <td style="text-align:right">${Number(r.weight||0).toFixed(3)}</td>
+      <td><span class="badge-zone ${ZONE_BADGE[r.zone]||'z5'}">Z${r.zone||5}</span></td>
+      <td style="text-align:right;font-weight:600">₹${fmt(r.total_amount)}</td>
+    </tr>
+  `).join('') : `<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px">No bookings yet — <a href="/booking-entry">add one</a></td></tr>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+// 6-MONTH INTERACTIVE LINE CHART
+// ══════════════════════════════════════════════════════════════
+let sixMonthData   = [];
+let currentMetric  = 'revenue';
+const METRIC_META = {
+  revenue: { color: '#c0392b', fmt: v => '₹' + fmt(v), fmtShort: v => fmtK(v) },
+  count:   { color: '#1565c0', fmt: v => Math.round(v) + ' bookings', fmtShort: v => Math.round(v) },
+  weight:  { color: '#1a9e6e', fmt: v => v.toFixed(2) + ' kg', fmtShort: v => v.toFixed(1) + 'kg' },
+};
+
+function resizeSixMonthCanvas() {
+  const canvas = document.getElementById('six-month-chart');
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = '230px';
+  canvas.width  = rect.width * dpr;
+  canvas.height = 230 * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { w: rect.width, h: 230, ctx };
+}
+
+function drawSixMonthChart() {
+  const canvas = document.getElementById('six-month-chart');
+  if (!canvas || !sixMonthData.length) return;
+  const { w, h, ctx } = resizeSixMonthCanvas();
+  const meta = METRIC_META[currentMetric];
+
+  const padding = { top: 18, right: 16, bottom: 30, left: 54 };
+  const chartW = w - padding.left - padding.right;
+  const chartH = h - padding.top - padding.bottom;
+
+  ctx.clearRect(0, 0, w, h);
+
+  const values = sixMonthData.map(d => d[currentMetric]);
+  const max = Math.max(...values, 1) * 1.15;
+
+  // gridlines + y-axis labels
+  ctx.strokeStyle = '#eef2f6';
+  ctx.lineWidth = 1;
+  ctx.font = '10px Segoe UI, system-ui, sans-serif';
+  ctx.fillStyle = '#7a8fa0';
+  ctx.textAlign = 'right';
+  for (let i = 0; i <= 4; i++) {
+    const y = padding.top + chartH - (chartH * i / 4);
+    ctx.beginPath();
+    ctx.moveTo(padding.left, y);
+    ctx.lineTo(w - padding.right, y);
+    ctx.stroke();
+    const val = max * i / 4;
+    ctx.fillText(meta.fmtShort(val), padding.left - 8, y + 3);
+  }
+
+  const n = sixMonthData.length;
+  const points = sixMonthData.map((d, i) => ({
+    x: padding.left + (n === 1 ? chartW/2 : chartW * i / (n - 1)),
+    y: padding.top + chartH - (chartH * (d[currentMetric] / max)),
+    ...d
+  }));
+
+  // area fill (gradient)
+  const grad = ctx.createLinearGradient(0, padding.top, 0, padding.top + chartH);
+  grad.addColorStop(0, meta.color + '40');
+  grad.addColorStop(1, meta.color + '00');
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, padding.top + chartH);
+  points.forEach(p => ctx.lineTo(p.x, p.y));
+  ctx.lineTo(points[points.length-1].x, padding.top + chartH);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // line
+  ctx.beginPath();
+  points.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+  ctx.strokeStyle = meta.color;
+  ctx.lineWidth = 2.5;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.stroke();
+
+  // points
+  points.forEach(p => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
+    ctx.fillStyle = '#fff';
+    ctx.strokeStyle = meta.color;
+    ctx.lineWidth = 2.5;
+    ctx.fill();
+    ctx.stroke();
+  });
+
+  // x-axis labels
+  ctx.fillStyle = '#3a4a58';
+  ctx.font = '11px Segoe UI, system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  points.forEach(p => ctx.fillText(p.label, p.x, h - 8));
+
+  canvas._points = points;
+}
+
+function attachSixMonthHover() {
+  const canvas  = document.getElementById('six-month-chart');
+  const tooltip = document.getElementById('chart-tooltip');
+  if (!canvas) return;
+
+  canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const points = canvas._points || [];
+    if (!points.length) return;
+    let closest = points[0], minDist = Infinity;
+    points.forEach(p => {
+      const d = Math.abs(p.x - mx);
+      if (d < minDist) { minDist = d; closest = p; }
+    });
+    const meta = METRIC_META[currentMetric];
+    tooltip.style.display = 'block';
+    tooltip.style.left = closest.x + 'px';
+    tooltip.style.top  = closest.y + 'px';
+    tooltip.innerHTML = `<b>${escHtml(closest.label)}</b><br>${meta.fmt(closest[currentMetric])}`;
+  });
+  canvas.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+}
+
+function buildChartSummary() {
+  if (!sixMonthData.length) return;
+  const meta = METRIC_META[currentMetric];
+  const values = sixMonthData.map(d => d[currentMetric]);
+  const latest = values[values.length - 1];
+  const prev   = values.length > 1 ? values[values.length - 2] : latest;
+  const total  = values.reduce((a,b) => a+b, 0);
+  const avg    = total / values.length;
+  const pctChange = prev ? ((latest - prev) / prev * 100) : 0;
+  const trendUp = pctChange >= 0;
+
+  document.getElementById('chart-summary').innerHTML = `
+    <div class="chart-summary-item">This month
+      <b>${meta.fmt(latest)}
+        <span class="trend-pill ${trendUp ? 'up' : 'down'}">
+          <i class="fa fa-arrow-${trendUp ? 'up' : 'down'}"></i>${Math.abs(pctChange).toFixed(1)}%
+        </span>
+      </b>
+    </div>
+    <div class="chart-summary-item">6-month total<b>${meta.fmt(total)}</b></div>
+    <div class="chart-summary-item">Monthly average<b>${meta.fmt(avg)}</b></div>
+  `;
+}
+
+function initChartToggle() {
+  document.getElementById('chart-toggle').addEventListener('click', (e) => {
+    const btn = e.target.closest('.toggle-btn');
+    if (!btn) return;
+    document.querySelectorAll('#chart-toggle .toggle-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentMetric = btn.dataset.metric;
+    drawSixMonthChart();
+    buildChartSummary();
+  });
+}
+
+function buildSixMonthChart(rows) {
+  sixMonthData = rows || [];
+  drawSixMonthChart();
+  buildChartSummary();
+}
+
+window.addEventListener('resize', () => {
+  if (sixMonthData.length) drawSixMonthChart();
+});
+
+// ── Fetch dashboard data ──────────────────────────────────────
+async function loadDashboard(isManualRefresh) {
+  const refreshBtn = document.getElementById('db-refresh-btn');
+  if (isManualRefresh) refreshBtn.classList.add('spinning');
+  try {
+    const res  = await fetch('/api/dashboard');
+    const data = await res.json();
+
+    buildKpis(data.kpis);
+    buildTrend(data.trend);
+    buildSixMonthChart(data.six_month_trend || []);
+    buildClients(data.top_clients);
+    buildZone(data.zones);
+    buildRecent(data.recent);
+  } catch (e) {
+    console.error('Dashboard load error:', e);
+    document.getElementById('kpi-grid').innerHTML =
+      '<div style="color:#c0392b;padding:16px;grid-column:1/-1">Failed to load dashboard data. Check /api/dashboard.</div>';
+  } finally {
+    if (isManualRefresh) {
+      setTimeout(() => refreshBtn.classList.remove('spinning'), 400);
+    }
+  }
+}
+
+document.getElementById('db-refresh-btn').addEventListener('click', () => loadDashboard(true));
+initChartToggle();
+attachSixMonthHover();
+loadDashboard();
+
+// Auto-refresh every 60 seconds to keep the dashboard "live"
+setInterval(() => loadDashboard(false), 60000);
+</script>
+{% endblock %}

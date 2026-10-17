@@ -1,0 +1,258 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<h4>Invoice / Statement</h4>
+<style>
+select.form-control,
+select.form-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%23555' d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px;
+  padding-right: 28px;
+}
+</style>
+<!-- Filter Form -->
+<form method="get" class="card p-3 mb-3">
+  <div class="row g-2 align-items-end">
+
+    <div class="col-md-2">
+      <label class="form-label mb-1">From Date</label>
+      <input type="date" name="from_date" class="form-control form-control-sm" value="{{ from_date }}">
+    </div>
+
+    <div class="col-md-2">
+      <label class="form-label mb-1">To Date</label>
+      <input type="date" name="to_date" class="form-control form-control-sm" value="{{ to_date }}">
+    </div>
+
+    <div class="col-md-2">
+      <label class="form-label mb-1">Month</label>
+      <select name="month" class="form-control form-control-sm">
+        <option value="">-- Select --</option>
+        {% for m in months %}
+        <option value="{{ m.value }}" {% if selected_month == m.value %}selected{% endif %}>{{ m.label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="col-md-2">
+      <label class="form-label mb-1">Code</label>
+      <select name="code" id="code_select" class="form-control form-control-sm">
+        <option value="ALL" {% if selected_code == 'ALL' %}selected{% endif %}>ALL</option>
+        {% for c in codes %}
+        <option value="{{ c.code }}" {% if selected_code == c.code %}selected{% endif %}>{{ c.code }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="col-md-2">
+      <label class="form-label mb-1">Fuel Surcharge (%)</label>
+      <input type="number" name="fuel_rate" id="fuel_rate_input" class="form-control form-control-sm"
+             step="0.01" min="0" value="{{ fuel_rate or '' }}" placeholder="e.g. 10"
+             oninput="recalcFuel(this.value)">
+    </div>
+
+    <div class="col-md-2">
+      <button class="btn btn-primary btn-sm w-100">
+        <i class="fa fa-filter"></i> Filter
+      </button>
+    </div>
+
+    <input type="hidden" name="limit" value="{{ limit }}">
+    <input type="hidden" name="page" value="1">
+  </div>
+</form>
+
+<!-- Hidden values for JS -->
+<span id="inv-from" style="display:none">{{ from_date }}</span>
+<span id="inv-to"   style="display:none">{{ to_date }}</span>
+<span id="inv-code" style="display:none">{{ selected_code }}</span>
+<span id="inv-fuel" style="display:none">{{ fuel_rate or 0 }}</span>
+
+<!-- Export Buttons -->
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <div class="d-flex gap-2">
+    <button class="btn btn-success btn-sm" onclick="exportInvoiceExcel()">
+      <i class="fa fa-file-excel"></i> Export Excel
+    </button>
+    <button class="btn btn-danger btn-sm" onclick="exportInvoicePDF()">
+      <i class="fa fa-file-pdf"></i> Export PDF
+    </button>
+  </div>
+
+  <!-- LIMIT DROPDOWN -->
+  <div class="d-flex align-items-center gap-1">
+    <label class="small">Show:</label>
+    <select name="limit" id="limit-select" class="form-select form-select-sm" style="width: auto;">
+      <option value="10"  {% if limit == '10'  %}selected{% endif %}>10</option>
+      <option value="20"  {% if limit == '20'  %}selected{% endif %}>20</option>
+      <option value="100" {% if limit == '100' %}selected{% endif %}>100</option>
+      <option value="500" {% if limit == '500' %}selected{% endif %}>500</option>
+      <option value="all" {% if limit == 'all' %}selected{% endif %}>All</option>
+    </select>
+  </div>
+</div>
+
+<!-- Pagination -->
+{% if limit != 'all' and total_pages > 1 %}
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <small>
+    Showing {{ ((page-1) * limit|int) + 1 }} –
+    {{ [page * limit|int, total]|min }} of {{ total }} entries
+  </small>
+  <nav>
+    <ul class="pagination pagination-sm mb-0">
+      <li class="page-item {% if page == 1 %}disabled{% endif %}">
+        <a class="page-link" href="{{ url_for('invoice', from_date=from_date, to_date=to_date, month=selected_month, code=selected_code, fuel_rate=fuel_rate, limit=limit, page=page-1) if page > 1 else '#' }}">&laquo;</a>
+      </li>
+      {% for p in range(1, total_pages+1) %}
+        {% if p == page %}
+        <li class="page-item active"><span class="page-link">{{ p }}</span></li>
+        {% elif p <= 3 or p > total_pages-3 or (p >= page-2 and p <= page+2) %}
+        <li class="page-item"><a class="page-link" href="{{ url_for('invoice', from_date=from_date, to_date=to_date, month=selected_month, code=selected_code, fuel_rate=fuel_rate, limit=limit, page=p) }}">{{ p }}</a></li>
+        {% elif p == 4 and page > 4 %}
+        <li class="page-item disabled"><span class="page-link">…</span></li>
+        {% endif %}
+      {% endfor %}
+      <li class="page-item {% if page == total_pages %}disabled{% endif %}">
+        <a class="page-link" href="{{ url_for('invoice', from_date=from_date, to_date=to_date, month=selected_month, code=selected_code, fuel_rate=fuel_rate, limit=limit, page=page+1) if page < total_pages else '#' }}">&raquo;</a>
+      </li>
+    </ul>
+  </nav>
+</div>
+{% elif limit == 'all' %}
+<small>Showing all {{ total }} entries</small>
+{% endif %}
+
+<!-- Table -->
+<div class="card p-3">
+  <table class="table table-bordered table-sm" id="invoiceTable" style="font-size:0.88rem;">
+    <thead class="table-dark">
+      <tr>
+        <th style="width:50px">SNO</th>
+        <th style="width:110px">DATE</th>
+        <th>DESTINATION</th>
+        <th>AWB_NO</th>
+        <th class="text-end" style="width:80px">WEIGHT</th>
+        <th class="text-end" style="width:90px">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% set ns = namespace(sno=0, base_total=0.0) %}
+    {% for date_val, group_rows in rows | groupby("booking_date") %}
+      {% set group_list = group_rows | list %}
+      {% for r in group_list %}
+        {% set ns.sno = ns.sno + 1 %}
+        {% set ns.base_total = ns.base_total + (r.total_amount | float) %}
+        <tr>
+          <td class="text-center">{{ ns.sno }}</td>
+          <td class="text-center fw-semibold">
+            {% if r.booking_date %}
+              {% if r.booking_date is string %}{{ r.booking_date }}
+              {% else %}{{ r.booking_date.strftime('%d-%m-%Y') }}{% endif %}
+            {% endif %}
+          </td>
+          <td>{{ r.destination }}</td>
+          <td>{{ r.awb_no }}</td>
+          <td class="text-end">{{ "%.3f" | format(r.weight | float) }}</td>
+          <td class="text-end row-base">{{ "%.2f" | format(r.total_amount | float) }}</td>
+        </tr>
+      {% endfor %}
+    {% else %}
+      <tr><td colspan="6" class="text-center text-muted">No Records Found</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="d-flex justify-content-end align-items-center gap-4 mt-2 flex-wrap">
+    <span class="fw-bold">
+      Sum of Total Amount: <span id="sumBase">{{ "%.2f" | format(ns.base_total) }}</span>
+    </span>
+  </div>
+
+  <div id="fuelSummary" class="d-flex justify-content-end align-items-center gap-4 mt-2 flex-wrap"
+       style="{% if not fuel_rate or fuel_rate|float == 0 %}display:none{% endif %}">
+    <span class="fw-bold text-secondary">
+      Fuel Surcharge (<span id="fuelPercent">{{ fuel_rate or 0 }}</span>%): ₹<span id="fuelAmount">0.00</span>
+    </span>
+    <span class="fw-bold text-success">
+      Grand Total: ₹<span id="grandTotal">0.00</span>
+    </span>
+  </div>
+</div>
+
+<script>
+function recalcFuel(percent) {
+  percent = parseFloat(percent) || 0;
+  const sumBase    = parseFloat(document.getElementById('sumBase').textContent) || 0;
+  const fuelAmount = sumBase * percent / 100;
+  const grandTotal = sumBase + fuelAmount;
+  const fuelSummary = document.getElementById('fuelSummary');
+  if (percent > 0) {
+    fuelSummary.style.display = 'flex';
+    document.getElementById('fuelPercent').textContent = percent.toFixed(2);
+    document.getElementById('fuelAmount').textContent  = fuelAmount.toFixed(2);
+    document.getElementById('grandTotal').textContent  = grandTotal.toFixed(2);
+  } else {
+    fuelSummary.style.display = 'none';
+  }
+  document.getElementById('inv-fuel').textContent = percent || 0;
+}
+
+document.getElementById('limit-select').addEventListener('change', function() {
+  const url = new URL(window.location.href);
+  url.searchParams.set('limit', this.value);
+  url.searchParams.set('page', '1');
+  window.location.href = url.toString();
+});
+
+// ── FIX: reset the manual Fuel Surcharge override whenever the Code
+// changes. Without this, switching from e.g. SBH (5%) to APP (10%)
+// would silently resubmit SBH's leftover 5% value in the Fuel
+// Surcharge box, which _resolve_fuel_rate() on the backend treats as
+// an intentional manual override — so APP's invoice would wrongly use
+// 5% instead of auto-fetching its own 10% from Rate Entry. Clearing
+// the box here means a fresh Filter click always re-resolves the
+// correct per-code fuel % unless the user deliberately types one in
+// after picking the code.
+document.getElementById('code_select').addEventListener('change', function() {
+  const fuelInput = document.getElementById('fuel_rate_input');
+  fuelInput.value = '';
+  recalcFuel(0);
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+  const fuelInput = document.getElementById('fuel_rate_input');
+  if (fuelInput && fuelInput.value) recalcFuel(fuelInput.value);
+});
+
+function exportInvoiceExcel() {
+  const fd = new FormData();
+  fd.append('from_date', document.getElementById('inv-from').textContent.trim());
+  fd.append('to_date',   document.getElementById('inv-to').textContent.trim());
+  fd.append('code',      document.getElementById('inv-code').textContent.trim());
+  fd.append('fuel_rate', document.getElementById('inv-fuel').textContent.trim());
+  fetch('/invoice-export', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(d => { if (d.status === 'ok') alert('Excel file opened!'); })
+    .catch(e => alert('Export error: ' + e));
+}
+
+function exportInvoicePDF() {
+  const fd = new FormData();
+  fd.append('from_date', document.getElementById('inv-from').textContent.trim());
+  fd.append('to_date',   document.getElementById('inv-to').textContent.trim());
+  fd.append('code',      document.getElementById('inv-code').textContent.trim());
+  fd.append('fuel_rate', document.getElementById('inv-fuel').textContent.trim());
+  fetch('/invoice-pdf', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(d => { if (d.status === 'ok') alert('PDF file opened!'); })
+    .catch(e => alert('PDF error: ' + e));
+}
+</script>
+
+{% endblock %}

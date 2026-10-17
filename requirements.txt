@@ -1,0 +1,8 @@
+flask
+pymysql
+psycopg2-binary
+mysql-connector-python
+pandas
+openpyxl
+reportlab
+pywebview

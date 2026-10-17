@@ -1,0 +1,1122 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<h4 class="mb-3">Booking Entry</h4>
+
+<div class="d-flex justify-content-between mb-2">
+    <div class="d-flex align-items-center gap-2">
+    <label class="mb-0 fw-semibold" style="white-space:nowrap;">Show:</label>
+    <select class="form-select form-select-sm" id="limit-select" style="width:90px;">
+        <option value="10" selected>10</option>
+        <option value="20">20</option>
+        <option value="100">100</option>
+        <option value="500">500</option>
+        <option value="all">All</option>
+    </select>
+     <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-refresh-table" title="Refresh table" onclick="manualRefreshTable()">
+        <i class="fa fa-rotate"></i> Refresh
+    </button>
+</div>
+</div>
+
+<!-- ENTRY / EDIT FORM -->
+<div class="card p-3 mb-4">
+<form id="bk-form">
+<input type="hidden" name="_action"  id="bk-action"  value="add">
+<input type="hidden" name="edit_id"  id="bk-edit-id" value="">
+<input type="hidden" name="fuel"     value="0">
+<input type="hidden" name="zone" id="bk-zone" value="">
+
+<!-- ===== ROW 1: CODE, COMPANY NAME, DATE ===== -->
+<div class="row g-2 mb-2">
+    <div class="col-md-2">
+        <label class="form-label mb-1">CODE</label>
+        <div class="ac-wrap">
+            <input name="code" id="bk-code" class="form-control" placeholder="" required autocomplete="off"
+       style="background:#dbeafe; color:#1e40af; font-weight:700; border-color:#93c5fd;">
+            <div class="ac-drop" id="bk-code-drop"></div>
+        </div>
+    </div>
+    <div class="col-md-7">
+        <label class="form-label mb-1">Company Name</label>
+        <input name="code_fullform" id="bk-code-fullform" class="form-control"
+       placeholder="" autocomplete="off"
+       style="background:#fef9c3; color:#634019; font-weight:600; border-color:#7a7254;">
+    </div>
+    <div class="col-md-3">
+        <label class="form-label mb-1">DATE</label>
+        <input type="date" name="booking_date" id="bk-date" class="form-control" required
+       style="background:#dc3545; color:#fff; font-weight:700; border-color:#dc3545;">
+    </div>
+</div>
+
+<!-- ===== ROW 2: AWB NO, DESTINATION, WEIGHT, AMOUNT ===== -->
+<div class="row g-2 mb-2">
+    <div class="col-md-3">
+        <label class="form-label mb-1">AWB NO</label>
+        <input name="awb_no" id="bk-awb" class="form-control" autocomplete="off" placeholder="AWB number">
+        <div id="awb-warn" style="display:none;color:#dc3545;font-size:11px;margin-top:3px;">
+            <i class="fa fa-circle-exclamation"></i>
+            <span id="awb-warn-text"></span>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <label class="form-label mb-1">DESTINATION</label>
+        <div class="ac-wrap">
+            <input name="destination" id="bk-dest" class="form-control" autocomplete="off"
+                   placeholder="City / place or code"
+                   oninput="onDestInput(this.value)"
+                   onblur="onDestBlur(this.value)"
+                   onkeydown="onDestKeydown(event)">
+            <div class="ac-drop" id="bk-dest-drop"></div>
+        </div>
+        <div id="zone-badge-wrap" style="margin-top:4px; min-height:22px;"></div>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label mb-1">WEIGHT</label>
+        <input type="number" step="0.001" name="weight" id="bk-weight" class="form-control" placeholder="0.000" oninput="onWeightInput()">
+    </div>
+    <div class="col-md-2">
+        <label class="form-label mb-1">Amount</label>
+        <input type="number" step="0.01" name="auto_amount" id="bk-auto" class="form-control" placeholder="0.00" min="0" max="999999">
+    </div>
+    <div class="col-md-2 d-flex align-items-start gap-1" style="padding-top:24px;">
+        <button type="submit" class="btn btn-success flex-fill btn-submit" id="bk-submit-btn">
+            <i class="fa fa-save"></i> <span id="bk-save-lbl">Save</span>
+        </button>
+        <button type="button" class="btn btn-secondary" id="bk-cancel-btn"
+                style="display:none" onclick="bkCancel()">&#x2715;</button>
+    </div>
+</div>
+
+<!-- ===== ROW 3: COURIER ===== -->
+<div class="row g-2 mb-2">
+    <div class="col-md-3">
+        <label class="form-label mb-1">COURIER</label>
+        <input name="courier" id="bk-courier" class="form-control" value="ST COURIER">
+    </div>
+</div>
+
+<!-- Rate info bar -->
+<div class="row">
+    <div class="col-12">
+        <div id="rate-info" style="font-size:12px; min-height:18px; margin-top:2px;"></div>
+    </div>
+</div>
+
+</form>
+</div>
+
+<!-- SEARCH & TABLE -->
+<div class="card p-3">
+    <div class="mb-2 d-flex gap-2 align-items-center">
+        <input type="text" id="searchInput" class="form-control" placeholder="Search by any field (AWB, destination, code, company...)">
+        <button type="button" class="btn btn-primary btn-search-action" id="btn-search" onclick="triggerSearch()">
+            <i class="fa fa-search"></i> Search
+        </button>
+        <button type="button" class="btn btn-outline-secondary btn-search-action" id="btn-clear-search" onclick="clearSearch()" style="display:none;" title="Clear search">
+            <i class="fa fa-times"></i>
+        </button>
+    </div>
+    <div id="search-count" style="font-size:13px; color:#555; margin-bottom:8px; min-height:20px;"></div>
+    <div id="table-loading" class="text-center py-3" style="display:none;"><i class="fa fa-spinner fa-spin"></i> Loading...</div>
+    <div class="table-responsive">
+        <table class="table table-bordered table-striped table-sm" id="booking-table">
+            <thead class="table-dark">
+                <tr>
+                    <th>#</th><th>Code</th><th>Company Name</th><th>Date</th>
+                    <th>AWB</th><th>Dest</th><th>Wt</th><th>Courier</th><th class="text-end">Amount</th><th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="booking-table-body">
+                <tr><td colspan="10" class="text-center">Loading......</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ZONE SELECTION POPUP -->
+<div id="zone-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:99999; background:rgba(0,0,0,0.65); align-items:center; justify-content:center;">
+    <div style="background:#fff; border-radius:14px; width:420px; box-shadow:0 16px 60px rgba(0,0,0,0.45); overflow:hidden; animation:popIn .25s ease;">
+        <div style="background:linear-gradient(135deg,#ff9800,#f44336); padding:16px 22px; position:relative;">
+            <strong style="font-size:1.05rem; color:#fff;">⚠ Unknown Destination – Select Zone</strong>
+            <button onclick="hideZoneOverlay()" style="position:absolute;right:14px;top:12px;background:none;border:none; color:#fff;font-size:20px;cursor:pointer;">✕</button>
+        </div>
+        <div style="padding:20px 22px;">
+            <p>Destination: <strong id="zone-dest-label" style="color:#0d6efd;"></strong></p>
+            <p style="font-size:.82rem;">Pick a zone below — it will be remembered.</p>
+            <div style="margin-bottom:16px;">
+                <label style="font-size:.82rem; font-weight:600;">Place Code (optional)</label>
+                <input type="text" id="zone-place-code" placeholder="e.g. MAA, BLR" style="width:100%; padding:8px; text-transform:uppercase;">
+            </div>
+            <div style="display:flex; flex-direction:column; gap:9px;">
+                <button class="zone-btn" onclick="confirmZone(1)" style="background:linear-gradient(90deg,#0d6efd,#3b93ff);"><span class="zbadge">Z1</span> CHENNAI</button>
+                <button class="zone-btn" onclick="confirmZone(2)" style="background:linear-gradient(90deg,#198754,#2dba79);"><span class="zbadge">Z2</span> TAMIL NADU</button>
+                <button class="zone-btn" onclick="confirmZone(3)" style="background:linear-gradient(90deg,#e67e22,#f39c12); color:#000;"><span class="zbadge">Z3</span> SOUTH</button>
+                <button class="zone-btn" onclick="confirmZone(4)" style="background:linear-gradient(90deg,#dc3545,#e55365);"><span class="zbadge">Z4</span> NORTH METRO</button>
+                <button class="zone-btn" onclick="confirmZone(5)" style="background:linear-gradient(90deg,#495057,#6c757d);"><span class="zbadge">Z5</span> ROI</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+
+// ============================================================
+// SESSION STORAGE KEYS — persist code/company/date across page visits
+// ============================================================
+const SS_CODE     = 'bk_sticky_code';
+const SS_FULLFORM = 'bk_sticky_fullform';
+const SS_DATE     = 'bk_sticky_date';
+
+function ssGet(key)        { try { return sessionStorage.getItem(key) || ''; } catch(e) { return ''; } }
+function ssSet(key, val)   { try { sessionStorage.setItem(key, val || ''); } catch(e) {} }
+function ssClear()         { try { sessionStorage.removeItem(SS_CODE); sessionStorage.removeItem(SS_FULLFORM); sessionStorage.removeItem(SS_DATE); } catch(e) {} }
+
+// ============================================================
+// GLOBALS
+// ============================================================
+let currentView       = 'recent';
+let allDataLoaded     = false;
+let loadedForSearch   = false;
+const destCache       = {};
+let destTimer         = null;
+let pendingDest       = null;
+let lastRateRow       = null;
+let isSubmitting      = false;
+let searchTimer       = null;
+let workingDate       = null;
+let tableRowCount     = 0;
+
+// ── NEW: race-condition guard for resolveDestination() ──
+// Every call to resolveDestination() gets a fresh token. If a newer
+// call has started by the time an older call's async work finishes,
+// the older call's result is silently dropped instead of overwriting
+// the UI with stale data (this is what caused "typed CHEN, picked
+// CHENNAI, but the Unknown Destination popup still appeared").
+let destResolveToken = 0;
+
+// ── In-memory sticky (mirrors sessionStorage for speed) ──
+let stickyCode     = "";
+let stickyFullform = "";
+let stickyDate     = "";
+
+// ── Snapshot saved when edit starts, restored after update ──
+let preEditCode     = "";
+let preEditFullform = "";
+let preEditDate     = "";
+
+// ── helpers ──
+const escapeHtml = (s) => { if (!s) return ''; return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); };
+const esc = escapeHtml;
+
+function setVal(id, v) { document.getElementById(id).value = v; }
+function getVal(id)    { return (document.getElementById(id).value || "").trim().toUpperCase(); }
+
+// ── Sanitise amount: strip leading zeros, return clean number string or "" ──
+function sanitiseAmount(val) {
+    if (val === "" || val === null || val === undefined) return "";
+    const n = parseFloat(val);
+    if (isNaN(n) || n === 0) return "";
+    return n.toFixed(2);
+}
+
+// ============================================================
+// MANUAL REFRESH  (refreshes the bookings table below AND
+// re-validates the top entry form's zone/rate/amount against
+// fresh data — WITHOUT clearing anything the user has typed)
+// ============================================================
+async function manualRefreshTable() {
+  const btn = document.getElementById('btn-refresh-table');
+  const icon = btn.querySelector('i');
+  btn.disabled = true;
+  icon.classList.add('fa-spin');
+
+  const q = document.getElementById('searchInput').value.trim();
+  allDataLoaded = false; // force a fresh fetch, ignore any cached "all loaded" state
+
+  try {
+    if (q) {
+      // Re-run search against fresh data
+      await triggerSearch();
+    } else {
+      await loadTable(document.getElementById('limit-select').value);
+    }
+    // NEW: refresh the top form's calculated zone/rate/amount using
+    // whatever Code/Destination/Weight are already typed in — the
+    // values themselves are left exactly as-is.
+    await refreshEntryFormCalculations();
+  } finally {
+    btn.disabled = false;
+    icon.classList.remove('fa-spin');
+  }
+}
+
+// Re-runs destination/zone/rate resolution using the CURRENT values
+// already in the form (does not clear or change Code, Company, AWB,
+// Destination, Weight, Courier, or Date — only recalculates the zone
+// badge, matched rate, and Amount below Destination, in case the
+// Rate Entry or Zone tables changed since the page was loaded).
+async function refreshEntryFormCalculations() {
+  const code = getVal("bk-code");
+  const dest = document.getElementById("bk-dest").value.trim();
+  const zone = document.getElementById("bk-zone").value;
+
+  if (dest) {
+    // Re-resolve the destination against fresh rate/zone data —
+    // recalculates zone badge + rate + amount for the SAME destination.
+    await resolveDestination(dest);
+  } else if (code && zone) {
+    // No destination typed but a zone was already set — just
+    // re-fetch that zone's rate in case it changed.
+    await fetchRate(code, zone);
+  }
+}
+
+const ZONE_LABELS = {1:"Chennai",2:"Tamil Nadu",3:"South India",4:"North Metro",5:"ROI"};
+const ZONE_COLORS = {
+  1:{ bg:"#cce5ff", color:"#004085", badge:"#0d6efd" },
+  2:{ bg:"#d4edda", color:"#155724", badge:"#198754" },
+  3:{ bg:"#fff3cd", color:"#856404", badge:"#e67e22" },
+  4:{ bg:"#f8d7da", color:"#721c24", badge:"#dc3545" },
+  5:{ bg:"#e2e3e5", color:"#383d41", badge:"#6c757d" }
+};
+
+function showZoneBadge(zone, label, source) {
+  const wrap = document.getElementById("zone-badge-wrap");
+  const c    = ZONE_COLORS[zone] || ZONE_COLORS[5];
+  const src  = { saved:"💾 saved", rate_exact:"📋 rate table", rate_partial:"📋 partial match" }[source] || "";
+  wrap.innerHTML = `<span style="display:inline-flex;align-items:center;gap:6px; background:${c.bg};color:${c.color}; padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;"><span style="background:${c.badge};color:#fff; border-radius:50%;width:18px;height:18px; display:inline-flex;align-items:center;justify-content:center; font-size:10px;">Z${zone}</span> Zone ${zone} – ${label} ${src ? `<span style="font-weight:400;opacity:.75;font-size:11px;">(${src})</span>` : ""}</span>`;
+}
+function clearZoneBadge() { document.getElementById("zone-badge-wrap").innerHTML = ""; }
+
+function applyZone(place, zoneNum, source) {
+  document.getElementById("bk-zone").value = zoneNum;
+  showZoneBadge(zoneNum, ZONE_LABELS[zoneNum] || "ROI", source || "");
+}
+function clearZone() {
+  document.getElementById("bk-zone").value = "";
+  clearZoneBadge();
+  lastRateRow = null;
+}
+
+// ============================================================
+// RATE SLABS
+// ============================================================
+const SLABS = [
+  { max:0.25,     key:"rate_250g",      label:"≤250 g" },
+  { max:0.50,     key:"rate_500g",      label:"≤500 g" },
+  { max:1.00,     key:"rate_500g_1",    label:"≤1 kg" },
+  { max:3.00,     key:"rate_1_to_3kg",  label:"1–3 kg/kg" },
+  { max:10.00,    key:"rate_3_to_10kg", label:"3–10 kg/kg" },
+  { max:Infinity, key:"rate_above_10kg",label:">10 kg/kg" }
+];
+
+function computeAmount(rateRow, weight) {
+  if (!rateRow || !weight) return null;
+  const w = parseFloat(weight);
+  if (isNaN(w) || w <= 0) return null;
+  for (const s of SLABS)
+    if (w <= s.max) {
+      const rate   = parseFloat(rateRow[s.key] || 0);
+      const amount = s.max > 1 ? Math.ceil(w) * rate : rate;
+      return { amount, slab: s.label, rate };
+    }
+  return null;
+}
+
+async function fetchRate(code, zone) {
+  if (!code || !zone) return;
+  try {
+    const r = await fetch(`/api/rate/lookup?code=${encodeURIComponent(code)}&zone=${encodeURIComponent(zone)}`).then(x=>x.json());
+    lastRateRow = (r && r.id) ? r : null;
+  } catch(e) { lastRateRow = null; }
+  applyWeightRate();
+}
+
+function applyWeightRate() {
+  const weight = document.getElementById("bk-weight").value;
+  const zone   = document.getElementById("bk-zone").value;
+  const code   = getVal("bk-code");
+  const info   = document.getElementById("rate-info");
+  if (!lastRateRow) {
+    if (code && zone) info.innerHTML = `<span style="color:#dc3545">⚠ No rate found for code <strong>${code}</strong> zone <strong>${zone}</strong></span>`;
+    clearAmounts(); return;
+  }
+  if (!weight || parseFloat(weight) <= 0) { clearAmounts(); return; }
+  const result = computeAmount(lastRateRow, weight);
+  if (!result) { clearAmounts(); return; }
+  document.getElementById("bk-auto").value = result.amount;
+  info.innerHTML = `✓ <strong>${code}</strong> → Zone ${zone} (${ZONE_LABELS[zone] || ""}) | Slab: <strong style="color:#0d6efd">${result.slab}</strong> | Rate: ₹${result.rate.toFixed(2)} | <strong style="color:#198754">Amount: ₹${result.amount}</strong>`;
+  const autoEl = document.getElementById("bk-auto");
+  autoEl.classList.remove("rate-flash"); void autoEl.offsetWidth; autoEl.classList.add("rate-flash");
+}
+
+function clearAmounts() { document.getElementById("bk-auto").value = ""; }
+function onWeightInput() { applyWeightRate(); }
+
+// ============================================================
+// DESTINATION RESOLUTION
+// ============================================================
+// FIX: guarded against the classic "typed CHEN, picked CHENNAI from
+// the dropdown, but the Unknown Destination popup still showed up
+// for CHEN" race. Two things changed:
+//   1. Every call takes a token (destResolveToken) at the top.
+//   2. Before each point where the function would actually UPDATE
+//      the UI (cache hit, exact API match, or the not-found/zone-
+//      overlay fallback), it checks whether a NEWER call has since
+//      started. If so, this (now-stale) call's result is dropped
+//      silently instead of clobbering whatever the newer call did.
+// This makes the function safe even if it somehow still gets
+// triggered twice in quick succession for the same field.
+async function resolveDestination(dest) {
+  const myToken = ++destResolveToken;
+
+  const code   = getVal("bk-code");
+  const destUp = dest.trim().toUpperCase();
+  const info   = document.getElementById("rate-info");
+  if (!destUp) { clearZone(); clearAmounts(); return; }
+  const cacheKey = code + "|" + destUp;
+
+  if (destCache[cacheKey]) {
+    const c = destCache[cacheKey];
+    if (myToken !== destResolveToken) return; // a newer resolution has started — drop this stale result
+    applyZone(c.place, c.zone, c.source);
+    document.getElementById("bk-dest").value = c.place;
+    info.innerHTML = `🔍 Matched: <strong>${c.place}</strong> (Zone ${c.zone} – ${ZONE_LABELS[c.zone]||""}) <span style="color:#6c757d">[cache]</span>`;
+    await fetchRate(code, c.zone);
+    return;
+  }
+
+  try {
+    const res  = await fetch(`/api/dest/zone-lookup?dest=${encodeURIComponent(destUp)}&code=${encodeURIComponent(code)}`);
+    const data = await res.json();
+    if (data && data.place) {
+      if (myToken !== destResolveToken) return; // stale — a newer call has since taken over
+      destCache[cacheKey] = { place: data.place, zone: data.zone, source: "rate_exact" };
+      applyZone(data.place, data.zone, "rate_exact");
+      document.getElementById("bk-dest").value = data.place;
+      info.innerHTML = `📋 Matched: <strong>${data.place}</strong> (Zone ${data.zone} – ${ZONE_LABELS[data.zone]||""})`;
+      await fetchRate(code, data.zone);
+      return;
+    }
+  } catch(e) { console.error(e); }
+
+  if (myToken !== destResolveToken) return; // stale — don't clear/overlay over a newer, already-resolved match
+  clearZone(); clearAmounts();
+  info.innerHTML = `<span style="color:#dc3545">⚠ Destination not found – please select zone below</span>`;
+  showZoneOverlay(destUp);
+}
+
+function onDestInput(val) { clearZone(); clearAmounts(); document.getElementById("rate-info").textContent = ""; }
+function onDestBlur(val)  { clearTimeout(destTimer); destTimer = setTimeout(() => resolveDestination(val), 180); }
+
+// FIX: if the autocomplete dropdown is open with a suggestion
+// highlighted, let setupAC()'s own keydown handler (bound via
+// addEventListener, which fires AFTER this inline attribute
+// handler) take care of Enter/Tab — it knows the FULL picked value
+// (e.g. "CHENNAI"), not just whatever partial text is currently
+// typed (e.g. "CHEN"). Previously both handlers fired and kicked
+// off two competing resolveDestination() calls, and whichever
+// network response came back second would win — sometimes showing
+// the "Unknown Destination" popup for the partial text even after
+// you'd already picked the correct full destination.
+function onDestKeydown(e) {
+  if (e.key === "Enter" || e.key === "Tab") {
+    const drop = document.getElementById("bk-dest-drop");
+    if (drop && drop.classList.contains("open")) {
+      // Do nothing here — setupAC's keydown handler will pick the
+      // highlighted suggestion and call resolveDestination() itself.
+      return;
+    }
+    clearTimeout(destTimer);
+    resolveDestination(e.target.value);
+  }
+}
+
+// ============================================================
+// ZONE OVERLAY
+// ============================================================
+function showZoneOverlay(dest) { pendingDest = dest; document.getElementById("zone-dest-label").textContent = dest; document.getElementById("zone-place-code").value = ""; document.getElementById("zone-overlay").style.display = "flex"; }
+function hideZoneOverlay()     { document.getElementById("zone-overlay").style.display = "none"; pendingDest = null; }
+async function confirmZone(zone) {
+  const dest      = pendingDest;
+  const placeCode = document.getElementById("zone-place-code").value.trim().toUpperCase();
+  if (!dest) { hideZoneOverlay(); return; }
+  hideZoneOverlay();
+  try {
+    await fetch("/api/place/save-zone", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ place:dest, zone, place_code:placeCode||null }) });
+    const code = getVal("bk-code");
+    delete destCache[code + "|" + dest];
+    applyZone(dest, zone, "saved");
+    document.getElementById("rate-info").innerHTML = `💾 Saved: <strong>${dest}</strong> → Zone ${zone} – ${ZONE_LABELS[zone]||"ROI"}`;
+    await fetchRate(code, zone);
+  } catch(e) { document.getElementById("rate-info").innerHTML = `<span style="color:#dc3545">⚠ Failed to save zone mapping.</span>`; }
+}
+
+// ============================================================
+// TABLE LOAD
+// ============================================================
+async function loadTable(limit) {
+    const tbody      = document.getElementById('booking-table-body');
+    const loadingDiv = document.getElementById('table-loading');
+    loadingDiv.style.display = 'block';
+    tbody.innerHTML  = '<tr><td colspan="10" class="text-center">Loading......</td></tr>';
+    document.getElementById('searchInput').value        = '';
+    document.getElementById('search-count').textContent = '';
+    document.getElementById('btn-clear-search').style.display = 'none';
+    allDataLoaded = (limit === 'all');
+    try {
+        const rows = await fetch(`/api/bookings?limit=${limit}`).then(r => r.json());
+        if (!rows.length) {
+            tbody.innerHTML = '<tr><td colspan="10" class="text-center">No Records</td></tr>';
+            document.getElementById('search-count').textContent = 'Showing 0 – 0 of 0 entries';
+            tableRowCount = 0;
+            loadingDiv.style.display = 'none';
+            return;
+        }
+        renderRows(rows);
+        tableRowCount = rows.length;
+        filterTable();
+    } catch(e) {
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center text-danger">Failed to load</td></tr>';
+    } finally {
+        loadingDiv.style.display = 'none';
+    }
+}
+
+function renderRows(rows) {
+  const tbody = document.getElementById('booking-table-body');
+  tbody.innerHTML = rows.map((b,i) => rowHtml(b, i+1)).join("");
+}
+
+// ── FIX: sanitiseAmount used here so "040" → "40" and "0" → "" ──
+function rowHtml(b, num) {
+  const amt = sanitiseAmount(b.auto_amount);
+  return `
+    <tr id="brow-${b.id}">
+      <td>${num}</td>
+      <td style="background:#dbeafe; color:#1e40af; font-weight:700; text-align:center;">
+        <strong>${esc(b.code)}</strong>
+      </td>
+      <td style="max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; background:#fef9c3; color:#854d0e; font-weight:600;" title="${esc(b.code_fullform||'')}">
+        ${esc(b.code_fullform||'')}
+      </td>
+      <td>${esc(b.booking_date)}</td>
+      <td>${esc(b.awb_no)}</td>
+      <td>${esc(b.destination)}</td>
+      <td>${b.weight}</td>
+      <td>${esc(b.courier)}</td>
+      <td class="text-end">${amt}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-warning btn-act btn-sm" onclick='bkEdit(${JSON.stringify(b)})'><i class="fa fa-pen"></i></button>
+        <button class="btn btn-info btn-act btn-sm text-white" onclick='bkCopy(${JSON.stringify(b)})'><i class="fa fa-copy"></i></button>
+        <button class="btn btn-danger btn-act btn-sm" onclick="deleteBooking(${b.id})"><i class="fa fa-trash"></i></button>
+      </td>
+    </tr>`;
+}
+
+// ============================================================
+// PREPEND NEW ROW IMMEDIATELY
+// ============================================================
+function prependNewRow(savedData) {
+  const tbody = document.getElementById('booking-table-body');
+  const noRec = tbody.querySelector('td[colspan]');
+  if (noRec) noRec.closest('tr').remove();
+
+  tableRowCount++;
+  Array.from(tbody.querySelectorAll('tr[id^="brow-"]')).forEach((tr, i) => {
+    tr.cells[0].textContent = i + 2;
+  });
+
+  const amt     = sanitiseAmount(savedData.auto_amount);
+  const tempRow = document.createElement('tr');
+  tempRow.id = 'brow-' + savedData.id;
+  tempRow.innerHTML = `
+    <td>1</td>
+    <td style="background:#dbeafe; color:#1e40af; font-weight:700; text-align:center;"><strong>${esc(savedData.code)}</strong></td>
+    <td style="max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; background:#fef9c3; color:#854d0e; font-weight:600;" title="${esc(savedData.code_fullform||'')}">${esc(savedData.code_fullform||'')}</td>
+    <td>${esc(savedData.booking_date)}</td>
+    <td>${esc(savedData.awb_no)}</td>
+    <td>${esc(savedData.destination)}</td>
+    <td>${savedData.weight}</td>
+    <td>${esc(savedData.courier)}</td>
+    <td class="text-end">${amt}</td>
+    <td style="white-space:nowrap">
+      <button class="btn btn-warning btn-act btn-sm" onclick='bkEdit(${JSON.stringify(savedData)})'><i class="fa fa-pen"></i></button>
+      <button class="btn btn-info btn-act btn-sm text-white" onclick='bkCopy(${JSON.stringify(savedData)})'><i class="fa fa-copy"></i></button>
+      <button class="btn btn-danger btn-act btn-sm" onclick="deleteBooking(${savedData.id})"><i class="fa fa-trash"></i></button>
+    </td>`;
+  tempRow.style.animation = 'highlightNew .8s ease';
+  tbody.insertBefore(tempRow, tbody.firstChild);
+  filterTable();
+}
+
+// ============================================================
+// SEARCH
+// ============================================================
+async function triggerSearch() {
+  const q = document.getElementById('searchInput').value.trim();
+  if (!q) { filterTable(); return; }
+  if (!allDataLoaded) {
+    const loadingDiv = document.getElementById('table-loading');
+    const countEl   = document.getElementById('search-count');
+    loadingDiv.style.display = 'block';
+    countEl.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Loading all records for search…';
+    try {
+      const rows = await fetch('/api/bookings?limit=all').then(r => r.json());
+      allDataLoaded = true; currentView = 'all';
+      renderRows(rows); tableRowCount = rows.length;
+    } catch(e) {
+      countEl.textContent = 'Failed to load records.';
+      loadingDiv.style.display = 'none'; return;
+    } finally { loadingDiv.style.display = 'none'; }
+  }
+  filterTable();
+}
+
+function filterTable() {
+  const q        = document.getElementById('searchInput').value.toLowerCase().trim();
+  const rows     = Array.from(document.getElementById('booking-table-body').getElementsByTagName('tr'));
+  const clearBtn = document.getElementById('btn-clear-search');
+  let shown = 0, total = 0;
+  const oldInfo = document.getElementById('search-info-row'); if (oldInfo) oldInfo.remove();
+  for (const row of rows) {
+    if (row.cells.length === 1 && row.cells[0].colSpan > 1) continue;
+    total++;
+    let text = ''; for (let i=0; i<row.cells.length-1; i++) text += row.cells[i].innerText.toLowerCase() + ' ';
+    const show = !q || text.includes(q);
+    row.style.display = show ? '' : 'none';
+    if (show) shown++;
+  }
+  const countEl = document.getElementById('search-count');
+  if (total > 0) countEl.innerHTML = q
+    ? `Showing <strong>${shown}</strong> of ${total} entries <span style="color:#0d6efd;">(filtered by "${esc(q)}")</span>`
+    : `Showing 1 – ${shown} of ${total} entries`;
+  else countEl.textContent = '';
+  clearBtn.style.display = q ? 'inline-block' : 'none';
+  if (shown === 0 && q) {
+    const tbody   = document.getElementById('booking-table-body');
+    const infoRow = tbody.insertRow(); infoRow.id = 'search-info-row';
+    const cell    = infoRow.insertCell(0); cell.colSpan = 10; cell.className = 'text-center text-muted py-3';
+    cell.innerHTML = `<i class="fa fa-search"></i> No records found matching the current search`;
+  }
+}
+
+function clearSearch() {
+  document.getElementById('searchInput').value = '';
+  document.getElementById('btn-clear-search').style.display = 'none';
+  filterTable();
+}
+
+// ============================================================
+// DELETE
+// ============================================================
+async function deleteBooking(id) {
+  if (!confirm('Delete this booking?')) return;
+  const fd = new FormData();
+  fd.append('_action','delete'); fd.append('del_id', id);
+  await fetch('/booking-entry', { method:'POST', body:fd });
+  allDataLoaded = false;
+  await loadTable(document.getElementById('limit-select').value);
+  bkCancel();
+}
+
+// ============================================================
+// SAVE STICKY TO SESSION STORAGE
+// ============================================================
+function saveStickyToSession() {
+    ssSet(SS_CODE,     stickyCode);
+    ssSet(SS_FULLFORM, stickyFullform);
+    ssSet(SS_DATE,     stickyDate);
+}
+
+// ============================================================
+// CLEAR ROW 2 ONLY (keep code/company/date after save)
+// ============================================================
+function clearRow2() {
+  clearAwbWarning();
+  document.getElementById("bk-awb").value    = "";
+  document.getElementById("bk-dest").value   = "";
+  document.getElementById("bk-weight").value = "";
+  document.getElementById("bk-auto").value   = "";
+  clearZone();
+  document.getElementById("rate-info").textContent = "";
+  pendingDest = null;
+  lastRateRow = null;
+}
+
+// ============================================================
+// FORM SUBMIT
+// ============================================================
+document.getElementById('bk-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (isSubmitting) return;
+
+  // ── FIX: sanitise amount before validation ──
+  const autoEl  = document.getElementById('bk-auto');
+  const rawAmt  = autoEl.value;
+  const autoAmt = rawAmt === "" ? 0 : parseFloat(rawAmt);
+  if (!isNaN(autoAmt) && rawAmt !== "") {
+      autoEl.value = autoAmt; // strip leading zeros like 040 → 40
+  }
+
+  if (autoAmt > 999999) {
+    alert('⚠ Amount ₹' + autoAmt.toLocaleString('en-IN') + ' looks incorrect.\n\nPlease check the Weight and Destination — the rate will be recalculated automatically.');
+    document.getElementById('bk-weight').focus();
+    return;
+  }
+
+  const submitBtn = document.getElementById('bk-submit-btn');
+  const saveSpan  = document.getElementById('bk-save-lbl');
+  const isEdit    = document.getElementById('bk-action').value === 'edit';
+  isSubmitting    = true;
+  submitBtn.disabled = true;
+  saveSpan.innerHTML = isEdit
+    ? '<i class="fa fa-spinner fa-spin"></i> Updating...'
+    : '<i class="fa fa-spinner fa-spin"></i> Saving...';
+
+  const editedId        = document.getElementById('bk-edit-id').value;
+  const updatedCode     = document.getElementById('bk-code').value.trim();
+  const updatedFullform = document.getElementById('bk-code-fullform').value.trim();
+  const updatedDate     = document.getElementById('bk-date').value;
+  const updatedAwb      = document.getElementById('bk-awb').value.trim();
+  const updatedDest     = document.getElementById('bk-dest').value.trim();
+  const updatedWeight   = document.getElementById('bk-weight').value;
+  const updatedAmount   = autoEl.value;   // already sanitised above
+  const updatedCourier  = document.getElementById('bk-courier').value.trim();
+
+  try {
+    const fd   = new FormData(e.target);
+    const resp = await fetch('/booking-entry', { method:'POST', body:fd });
+    if (!resp.ok) { alert('Server error – could not save.'); return; }
+
+    if (isEdit) {
+      // UPDATE path — update row in-place
+      const row = document.getElementById('brow-' + editedId);
+      if (row) {
+        const cells = row.querySelectorAll('td');
+        cells[1].innerHTML   = `<strong>${esc(updatedCode)}</strong>`;
+        cells[1].style.cssText = "background:#dbeafe; color:#1e40af; font-weight:700; text-align:center;";
+        cells[2].textContent = updatedFullform;
+        cells[2].style.cssText = "max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; background:#fef9c3; color:#854d0e; font-weight:600;";
+        cells[3].textContent = updatedDate;
+        cells[4].textContent = updatedAwb;
+        cells[5].textContent = updatedDest;
+        cells[6].textContent = updatedWeight;
+        cells[7].textContent = updatedCourier;
+        // ── FIX: show sanitised amount, not raw string ──
+        cells[8].textContent = sanitiseAmount(updatedAmount);
+        row.classList.remove('editing-row');
+      }
+      bkCancelAfterEdit();
+      allDataLoaded = false;
+      loadTable(document.getElementById('limit-select').value);
+
+      const infoDiv = document.getElementById('rate-info');
+      infoDiv.style.color = '#198754';
+      infoDiv.innerHTML = '✓ Updated successfully.';
+      setTimeout(() => { if (infoDiv.innerHTML.includes('Updated')) infoDiv.innerHTML = ''; }, 2500);
+
+    } else {
+      // SAVE path
+      stickyCode     = updatedCode;
+      stickyFullform = updatedFullform;
+      stickyDate     = updatedDate;
+      saveStickyToSession(); // ── persist to sessionStorage ──
+
+      try {
+        const latest = await fetch('/api/bookings?limit=1').then(r => r.json());
+        if (latest && latest.length && latest[0].awb_no === updatedAwb) {
+          prependNewRow({
+            id:            latest[0].id,
+            code:          updatedCode,
+            code_fullform: updatedFullform,
+            booking_date:  updatedDate,
+            awb_no:        updatedAwb,
+            destination:   updatedDest,
+            weight:        updatedWeight,
+            courier:       updatedCourier,
+            auto_amount:   updatedAmount
+          });
+        } else {
+          allDataLoaded = false;
+          await loadTable(document.getElementById('limit-select').value);
+        }
+      } catch(_) {
+        allDataLoaded = false;
+        await loadTable(document.getElementById('limit-select').value);
+      }
+
+      clearRow2();
+      document.querySelectorAll(".editing-row").forEach(el => el.classList.remove("editing-row"));
+
+      const infoDiv = document.getElementById('rate-info');
+      infoDiv.style.color = '#198754';
+      infoDiv.innerHTML = '✓ Saved successfully. Enter next AWB.';
+      setTimeout(() => { if (infoDiv.innerHTML.includes('Saved')) infoDiv.innerHTML = ''; }, 2500);
+    }
+
+    document.getElementById('bk-awb').focus();
+  } catch (err) {
+    console.error(err); alert('Network error – could not save.');
+  } finally {
+    isSubmitting       = false;
+    submitBtn.disabled = false;
+    const stillEditing = document.getElementById('bk-action').value === 'edit';
+    saveSpan.innerHTML = stillEditing ? 'Update' : 'Save';
+  }
+});
+
+// ============================================================
+// VIEW SWITCH
+// ============================================================
+document.getElementById('limit-select').addEventListener('change', () => {
+    const val     = document.getElementById('limit-select').value;
+    currentView   = val === 'all' ? 'all' : 'limited';
+    allDataLoaded = val === 'all';
+    loadTable(val);
+});
+
+// ============================================================
+// EDIT / COPY / CANCEL
+// ============================================================
+function bkEdit(b) {
+  clearAwbWarning();
+  preEditCode     = stickyCode     || document.getElementById("bk-code").value.trim();
+  preEditFullform = stickyFullform || document.getElementById("bk-code-fullform").value.trim();
+  preEditDate     = stickyDate     || document.getElementById("bk-date").value;
+
+  document.getElementById("bk-action").value        = "edit";
+  document.getElementById("bk-edit-id").value       = b.id;
+  document.getElementById("bk-code").value          = b.code || "";
+  document.getElementById("bk-code-fullform").value = b.code_fullform || "";
+  document.getElementById("bk-date").value          = b.booking_date_iso || "";
+  document.getElementById("bk-awb").value           = b.awb_no || "";
+  document.getElementById("bk-dest").value          = b.destination || "";
+  document.getElementById("bk-weight").value        = b.weight || "";
+  document.getElementById("bk-courier").value       = b.courier || "ST COURIER";
+  // ── FIX: load amount without leading zeros ──
+  document.getElementById("bk-auto").value          = sanitiseAmount(b.auto_amount) || "";
+
+  if (b.zone) {
+    const zoneNum = parseInt(b.zone);
+    if (!isNaN(zoneNum)) applyZone(b.destination, zoneNum, "saved");
+  }
+  document.getElementById("bk-save-lbl").textContent     = "Update";
+  document.getElementById("bk-cancel-btn").style.display = "inline-block";
+  document.querySelectorAll(".editing-row").forEach(el => el.classList.remove("editing-row"));
+  const row = document.getElementById("brow-" + b.id);
+  if (row) row.classList.add("editing-row");
+  window.scrollTo({ top:0, behavior:"smooth" });
+  document.getElementById("rate-info").textContent = "";
+  if (b.destination) resolveDestination(b.destination);
+}
+
+function bkCopy(b) {
+  bkEdit(b);
+  document.getElementById("bk-action").value  = "add";
+  document.getElementById("bk-edit-id").value = "";
+  document.getElementById("bk-awb").value     = "";
+  document.getElementById("bk-save-lbl").textContent = "Save";
+}
+
+function bkCancelAfterEdit() {
+  clearAwbWarning();
+  document.getElementById("bk-action").value        = "add";
+  document.getElementById("bk-edit-id").value       = "";
+  document.getElementById("bk-code").value          = preEditCode || stickyCode || ssGet(SS_CODE) || "";
+  document.getElementById("bk-code-fullform").value = preEditFullform || stickyFullform || ssGet(SS_FULLFORM) || "";
+  document.getElementById("bk-date").value          = preEditDate || stickyDate || ssGet(SS_DATE) || workingDate || new Date().toISOString().split("T")[0];
+  document.getElementById("bk-awb").value           = "";
+  document.getElementById("bk-dest").value          = "";
+  document.getElementById("bk-courier").value       = "ST COURIER";
+  document.getElementById("bk-weight").value        = "";
+  document.getElementById("bk-auto").value          = "";
+  clearZone();
+  document.getElementById("bk-save-lbl").textContent     = "Save";
+  document.getElementById("bk-cancel-btn").style.display = "none";
+  document.getElementById("rate-info").textContent       = "";
+  document.querySelectorAll(".editing-row").forEach(el => el.classList.remove("editing-row"));
+  pendingDest = null; lastRateRow = null;
+}
+
+function bkCancel() {
+  clearAwbWarning();
+  document.getElementById("bk-action").value        = "add";
+  document.getElementById("bk-edit-id").value       = "";
+  document.getElementById("bk-code").value          = stickyCode || ssGet(SS_CODE) || "";
+  document.getElementById("bk-code-fullform").value = stickyFullform || ssGet(SS_FULLFORM) || "";
+  document.getElementById("bk-date").value          = stickyDate || ssGet(SS_DATE) || workingDate || new Date().toISOString().split("T")[0];
+  document.getElementById("bk-awb").value           = "";
+  document.getElementById("bk-dest").value          = "";
+  document.getElementById("bk-courier").value       = "ST COURIER";
+  document.getElementById("bk-weight").value        = "";
+  document.getElementById("bk-auto").value          = "";
+  clearZone();
+  document.getElementById("bk-save-lbl").textContent     = "Save";
+  document.getElementById("bk-cancel-btn").style.display = "none";
+  document.getElementById("rate-info").textContent       = "";
+  document.querySelectorAll(".editing-row").forEach(el => el.classList.remove("editing-row"));
+  pendingDest = null; lastRateRow = null;
+}
+
+// ── Track changes to CODE/Company/Date — save to session immediately ──
+document.addEventListener("DOMContentLoaded", () => {
+  ["bk-code","bk-code-fullform"].forEach(id => {
+    document.getElementById(id).addEventListener("input", () => {
+      if (document.getElementById("bk-action").value !== "edit") {
+        stickyCode     = document.getElementById("bk-code").value.trim();
+        stickyFullform = document.getElementById("bk-code-fullform").value.trim();
+        saveStickyToSession();
+      }
+    });
+  });
+  document.getElementById("bk-date").addEventListener("change", () => {
+    if (document.getElementById("bk-action").value !== "edit") {
+      stickyDate  = document.getElementById("bk-date").value;
+      workingDate = stickyDate;
+      saveStickyToSession();
+    }
+  });
+
+  // ── FIX: strip leading zeros when user manually types in amount field ──
+  document.getElementById("bk-auto").addEventListener("input", function() {
+    const raw = this.value;
+    if (raw !== "") {
+      const n = parseFloat(raw);
+      if (!isNaN(n)) {
+        // Only fix if value differs (e.g. "040" → "40")
+        // Don't interfere while typing decimals like "40."
+        if (!raw.endsWith(".") && String(n) !== raw) {
+          this.value = n;
+        }
+      }
+    }
+  });
+
+  document.getElementById("bk-weight").addEventListener("change", applyWeightRate);
+
+  document.getElementById("bk-auto").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); document.getElementById("bk-form").requestSubmit(); }
+  });
+});
+
+// ============================================================
+// AWB DUPLICATE CHECK
+// ============================================================
+let awbDuplicate = false, awbCheckTimer = null;
+const awbInput   = document.getElementById("bk-awb");
+const awbWarn    = document.getElementById("awb-warn");
+const awbWarnTxt = document.getElementById("awb-warn-text");
+function clearAwbWarning() { awbDuplicate = false; awbInput.style.cssText = ""; awbWarn.style.display = "none"; awbWarnTxt.textContent = ""; }
+function showAwbWarning(msg) { awbDuplicate = true; awbInput.style.borderColor = "#dc3545"; awbInput.style.background = "#fff0f0"; awbInput.style.color = "#dc3545"; awbInput.style.fontWeight = "bold"; awbWarnTxt.textContent = msg; awbWarn.style.display = "block"; }
+awbInput.addEventListener("input", () => {
+  // ── FIX: force uppercase live as user types/scans, so a barcode scanner
+  //         that sends "maa450051818" displays as "MAA450051818" instantly ──
+  const selStart = awbInput.selectionStart;
+  const selEnd   = awbInput.selectionEnd;
+  const upper    = awbInput.value.toUpperCase();
+  if (upper !== awbInput.value) {
+    awbInput.value = upper;
+    try { awbInput.setSelectionRange(selStart, selEnd); } catch(e) {}
+  }
+
+  clearAwbWarning(); clearTimeout(awbCheckTimer);
+  const val = awbInput.value.trim();
+  if (!val) return;
+  awbCheckTimer = setTimeout(async () => {
+    const editId = document.getElementById("bk-edit-id").value;
+    const data   = await fetch(`/api/ac/awb_check?awb=${encodeURIComponent(val)}&edit_id=${editId}`).then(r=>r.json()).catch(()=>({exists:false}));
+    if (data.exists) showAwbWarning(`Duplicate! AWB "${val}" already used for ${data.code||''} on ${data.date||''} → ${data.dest||''}`);
+  }, 350);
+});
+awbInput.addEventListener("keydown", e => {
+  if (awbDuplicate && (e.key==="Tab"||e.key==="Enter")) { e.preventDefault(); e.stopImmediatePropagation(); awbInput.focus(); }
+});
+
+// ============================================================
+// AUTOCOMPLETE
+// ============================================================
+function setupAC(inputId, url, onSelect, labelFn, subFn) {
+  const input = document.getElementById(inputId);
+  let drop    = document.getElementById(inputId+"-drop");
+  if (!drop) { drop = document.createElement("div"); drop.className = "ac-drop"; drop.id = inputId+"-drop"; input.parentNode.appendChild(drop); }
+  let timer, hi = -1;
+  const closeMe = () => { drop.classList.remove("open"); hi = -1; };
+  function render(items) {
+    if (!items.length) { closeMe(); return; }
+    drop.innerHTML = ""; hi = 0;
+    items.forEach((item,i) => {
+      const div = document.createElement("div"); div.className = "ac-item" + (i===0?" hi":"");
+      const lbl = labelFn ? labelFn(item) : String(item);
+      const sub = subFn  ? subFn(item)   : "";
+      div.innerHTML = `<strong>${esc(lbl)}</strong>` + (sub ? `<div class="ac-sub">${esc(sub)}</div>` : "");
+      div.addEventListener("mousedown", e => { e.preventDefault(); pick(item); });
+      drop.appendChild(div);
+    });
+    drop.classList.add("open");
+    document.querySelectorAll(".ac-drop.open").forEach(d => { if (d!==drop) d.classList.remove("open"); });
+  }
+  const pick = item => { onSelect(item); closeMe(); };
+  const moveHi = delta => {
+    const els = drop.querySelectorAll(".ac-item"); if (!els.length) return;
+    if (hi>=0) els[hi]?.classList.remove("hi");
+    hi = Math.max(0, Math.min(els.length-1, (hi<0?0:hi)+delta));
+    els[hi]?.classList.add("hi"); els[hi]?.scrollIntoView({ block:"nearest" });
+  };
+  input.addEventListener("input", () => {
+    clearTimeout(timer); const q = input.value.trim(); if (!q) { closeMe(); return; }
+    timer = setTimeout(async () => { const data = await fetch(url+encodeURIComponent(q)).then(r=>r.json()).catch(()=>[]); render(data); }, 80);
+  });
+  input.addEventListener("keydown", e => {
+    if (!drop.classList.contains("open")) return;
+    if (e.key==="ArrowDown")  { e.preventDefault(); moveHi(1); }
+    else if (e.key==="ArrowUp") { e.preventDefault(); moveHi(-1); }
+    else if (e.key==="Enter")   { const h = drop.querySelector(".ac-item.hi"); if (h) { e.preventDefault(); e.stopImmediatePropagation(); h.dispatchEvent(new MouseEvent("mousedown")); } }
+    else if (e.key==="Escape") closeMe();
+  });
+  input.addEventListener("blur", () => setTimeout(closeMe, 160));
+}
+document.addEventListener("click", e => { if (!e.target.closest(".ac-wrap")) document.querySelectorAll(".ac-drop.open").forEach(d => d.classList.remove("open")); });
+
+function onCodeSelect(item) {
+  setVal("bk-code", item.code);
+  document.getElementById("bk-code-fullform").value = item.code_fullform || "";
+  if (document.getElementById("bk-action").value !== "edit") {
+    stickyCode     = item.code;
+    stickyFullform = item.code_fullform || "";
+    saveStickyToSession();
+  }
+  const dest = document.getElementById("bk-dest").value.trim();
+  if (dest) resolveDestination(dest);
+  setTimeout(() => document.getElementById("bk-awb").focus(), 50);
+}
+function onDestACSelect(v) { setVal("bk-dest", v); resolveDestination(v); }
+
+// ============================================================
+// CODE MANUAL ENTRY — auto-fill company + jump to AWB
+// ============================================================
+document.getElementById("bk-code").addEventListener("keydown", async (e) => {
+  if (e.key === "Tab" || e.key === "Enter") {
+    const code = document.getElementById("bk-code").value.trim();
+    if (!code) return;
+    if (!document.getElementById("bk-code-fullform").value.trim()) {
+      try {
+        const data  = await fetch(`/api/ac/code?q=${encodeURIComponent(code)}`).then(r => r.json());
+        const match = data.find(d => d.code.toUpperCase() === code.toUpperCase());
+        if (match) {
+          document.getElementById("bk-code-fullform").value = match.code_fullform || "";
+          if (document.getElementById("bk-action").value !== "edit") {
+            stickyCode     = code;
+            stickyFullform = match.code_fullform || "";
+            saveStickyToSession();
+          }
+        }
+      } catch(e) {}
+    }
+    if (e.key === "Enter") { e.preventDefault(); document.getElementById("bk-awb").focus(); }
+  }
+});
+
+// ============================================================
+// SEARCH INPUT
+// ============================================================
+document.getElementById('searchInput').addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => triggerSearch(), 300);
+});
+document.getElementById('searchInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { clearTimeout(searchTimer); triggerSearch(); }
+});
+
+// ============================================================
+// INIT — restore sticky values from sessionStorage on page load
+// ============================================================
+document.addEventListener("DOMContentLoaded", () => {
+    // ── Restore persisted code/company/date from sessionStorage ──
+    const savedCode     = ssGet(SS_CODE);
+    const savedFullform = ssGet(SS_FULLFORM);
+    const savedDate     = ssGet(SS_DATE);
+
+    const dateEl = document.getElementById("bk-date");
+    const today  = new Date().toISOString().split("T")[0];
+
+    // Always start with today if nothing saved, otherwise restore what user had
+    if (savedDate) {
+        dateEl.value = savedDate;
+        workingDate  = savedDate;
+        stickyDate   = savedDate;
+    } else {
+        dateEl.value = today;
+        workingDate  = today;
+        stickyDate   = today;
+    }
+
+    if (savedCode) {
+        document.getElementById("bk-code").value          = savedCode;
+        document.getElementById("bk-code-fullform").value = savedFullform;
+        stickyCode     = savedCode;
+        stickyFullform = savedFullform;
+    }
+
+    const courierEl = document.getElementById("bk-courier");
+    if (!courierEl.value) courierEl.value = "ST COURIER";
+
+    loadTable(document.getElementById('limit-select').value);
+    setupAC("bk-code", "/api/ac/code?q=", onCodeSelect, i => i.code, i => i.code_fullform);
+    setupAC("bk-dest", "/api/ac/destination?q=", onDestACSelect);
+});
+</script>
+
+<style>
+.ac-drop { display:none; position:absolute; z-index:1000; background:#fff; border:1px solid #ccc; max-height:200px; overflow-y:auto; width:100%; }
+.ac-drop.open { display:block; }
+.ac-item { padding:6px 10px; cursor:pointer; border-bottom:1px solid #eee; }
+.ac-item.hi { background:#e0e8ff; }
+.ac-sub { font-size:11px; color:#6c757d; }
+.ac-wrap { position:relative; }
+@keyframes rateFlash { 0% { background:#bbf7d0; box-shadow:0 0 0 3px #34d399; } 100% { background:transparent; box-shadow:none; } }
+.rate-flash { animation: rateFlash .7s ease; }
+@keyframes popIn { from { opacity:0; transform:scale(.9) translateY(-10px); } to { opacity:1; transform:scale(1) translateY(0); } }
+@keyframes highlightNew { 0% { background:#bbf7d0; } 100% { background:transparent; } }
+.zone-btn { width:100%; padding:11px 14px; border:none; border-radius:8px; cursor:pointer; color:#fff; font-weight:600; font-size:.88rem; text-align:left; display:flex; align-items:center; gap:10px; transition:filter .15s, transform .1s; }
+.zone-btn:hover { filter:brightness(1.12); transform:translateX(3px); }
+.zone-btn:active { transform:scale(.98); }
+.zbadge { display:inline-flex; align-items:center; justify-content:center; background:rgba(255,255,255,.25); border-radius:50%; width:24px; height:24px; font-size:11px; font-weight:800; flex-shrink:0; }
+.editing-row { background:#fff8dc !important; outline:2px solid #ffc107; }
+#search-count { font-size:13px; color:#555; padding:2px 0; min-height:20px; }
+#bk-form .row { padding-bottom: 4px; }
+#bk-form .row + .row { border-top: 1px dashed #dee2e6; padding-top: 8px; }
+.btn-search-action { white-space: nowrap; flex-shrink: 0; }
+
+/* NEW: darker, more visible borders on the Booking Entry form fields.
+   No !important here — AWB, Destination, Weight, Amount and Courier
+   pick this up since they use the plain default border, while Code,
+   Company Name and Date keep their own intentional colored borders
+   (set inline) since inline styles still win. */
+#bk-form .form-control,
+#bk-form .form-select {
+    border-width: 1.5px;
+    border-color: #6c757d;
+}
+#bk-form .form-control:focus,
+#bk-form .form-select:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.2rem rgba(13,110,253,.25);
+}
+
+/* NEW: darker grid lines around each cell in the bookings table —
+   same treatment as the Rate Entry table. */
+.table-bordered {
+    border-color: #343a40 !important;
+}
+.table-bordered th,
+.table-bordered td {
+    border-color: #343a40 !important;
+}
+</style>
+{% endblock %}

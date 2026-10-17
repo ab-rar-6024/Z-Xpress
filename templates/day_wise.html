@@ -1,0 +1,334 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<h4>Day Wise (Manual Entry)</h4>
+
+<!-- FILTER: single Month picker (e.g. picking "6" shows only June's rows) -->
+<form method="get" class="card p-3 mb-3" id="dw-filter-form" onsubmit="return dwPrepareMonthFilter();">
+<div class="row g-2">
+<div class="col-md-3">
+    <label>Month</label>
+    <input type="month" id="dw-month-input" class="form-control">
+</div>
+<!-- These are the values actually submitted / read by the backend -->
+<input type="hidden" name="from" id="dw-filter-from" value="{{ from_date }}">
+<input type="hidden" name="to"   id="dw-filter-to"   value="{{ to_date }}">
+<div class="col-md-2 d-flex align-items-end">
+    <button class="btn btn-primary w-100">
+        <i class="fa fa-filter"></i> Filter
+    </button>
+</div>
+</div>
+</form>
+
+<!-- EXPORT -->
+<form method="post" action="/day-wise-export">
+<input type="hidden" name="from_date" value="{{ from_date }}">
+<input type="hidden" name="to_date"   value="{{ to_date }}">
+<button class="btn btn-success mb-2">
+    <i class="fa fa-file-excel"></i> Export to Excel
+</button>
+</form>
+
+<!-- TABLE -->
+<div class="card p-3">
+<table class="table table-bordered table-sm">
+<thead class="table-dark">
+<tr>
+<th>SNO</th><th>Date</th><th class="text-end">Total Weight</th><th class="text-end">Total Sales Amount</th><th>Action</th>
+</tr>
+</thead>
+<tbody>
+{% for r in rows %}
+<tr id="dwrow-{{ r.entry_date_iso }}">
+<td>{{ loop.index }}</td>
+<td>{{ r.entry_date }}</td>
+<td class="text-end">{{ "%.3f"|format(r.total_weight or 0) }}</td>
+<td class="text-end">{{ "%.2f"|format(r.total_sales or 0) }}</td>
+<td>
+    <button type="button" class="btn btn-danger btn-act btn-sm"
+        onclick="dwAskDelete('{{ r.entry_date_iso }}', '{{ r.entry_date }}')">
+        <i class="fa fa-trash"></i>
+    </button>
+    <!-- Hidden delete form submitted only after admin login verified -->
+    <form method="post" id="dwdel-{{ r.entry_date_iso }}" style="display:none">
+        <input type="hidden" name="_action"   value="delete">
+        <input type="hidden" name="del_date"  value="{{ r.entry_date_iso }}">
+        <input type="hidden" name="from_date" value="{{ from_date }}">
+        <input type="hidden" name="to_date"   value="{{ to_date }}">
+    </form>
+</td>
+</tr>
+{% else %}
+<tr><td colspan="5" class="text-center">No Records for this month</td></tr>
+{% endfor %}
+</tbody>
+</table>
+<h6 class="text-end mt-2">
+<strong>
+Grand Total Weight: {{ "%.3f"|format(grand_weight or 0) }} |
+Grand Total Sales: {{ "%.2f"|format(grand_sales or 0) }}
+</strong>
+</h6>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════
+     DELETE CONFIRM + MINI ADMIN LOGIN MODAL
+════════════════════════════════════════════════════════ -->
+<div id="dw-delete-backdrop"
+     style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.50);
+            z-index:1055; align-items:center; justify-content:center;">
+
+  <div style="background:#fff; border-radius:10px; width:100%; max-width:370px;
+              box-shadow:0 8px 32px rgba(0,0,0,0.28); overflow:hidden;">
+
+    <!-- Header -->
+    <div style="background:#dc3545; padding:13px 18px;
+                display:flex; align-items:center; justify-content:space-between;">
+      <span style="color:#fff; font-weight:600; font-size:15px;">
+        <i class="fa fa-trash me-2"></i>Confirm Delete
+      </span>
+      <button onclick="dwCloseModal()" type="button"
+              style="background:none;border:none;color:#fff;font-size:22px;
+                     line-height:1;cursor:pointer;padding:0;">&times;</button>
+    </div>
+
+    <!-- Step 1 — Confirm -->
+    <div id="dw-step1" style="padding:20px 22px;">
+      <p style="font-size:14px; color:#555; margin-bottom:6px;">
+        You are about to delete the day-wise entry for:
+      </p>
+      <p id="dw-modal-datelabel"
+         style="font-size:17px; font-weight:700; color:#dc3545; margin-bottom:12px;"></p>
+      <div style="background:#fff8e1; border-left:4px solid #ffc107;
+                  padding:10px 14px; border-radius:4px; font-size:13px;
+                  color:#7a5c00; margin-bottom:18px;">
+        <i class="fa fa-exclamation-triangle me-1"></i>
+        this will delete the day-wise entry for the selected date.<br>
+        <strong>Booking entries data also deleted so proceed with caution.</strong>
+      </div>
+      <div class="d-flex gap-2">
+        <button onclick="dwCloseModal()" type="button"
+                class="btn btn-secondary flex-fill">Cancel</button>
+        <button onclick="dwShowLogin()" type="button"
+                class="btn btn-danger flex-fill">
+          <i class="fa fa-arrow-right me-1"></i>Proceed
+        </button>
+      </div>
+    </div>
+
+    <!-- Step 2 — Mini admin login -->
+    <div id="dw-step2" style="display:none; padding:20px 22px;">
+      <p style="font-size:13px; color:#555; margin-bottom:16px;">
+        <i class="fa fa-lock me-1 text-secondary"></i>
+        Enter admin credentials to confirm deletion.
+      </p>
+
+      <div class="mb-2">
+        <label style="font-size:11px; font-weight:700; color:#888;
+                      letter-spacing:.5px; text-transform:uppercase;">Username</label>
+        <input type="text" id="dw-del-user" class="form-control form-control-sm"
+               placeholder="Admin username" autocomplete="username">
+      </div>
+
+      <div class="mb-3">
+        <label style="font-size:11px; font-weight:700; color:#888;
+                      letter-spacing:.5px; text-transform:uppercase;">Password</label>
+        <div style="position:relative;">
+          <input type="password" id="dw-del-pass" class="form-control form-control-sm"
+                 placeholder="Admin password" autocomplete="current-password"
+                 onkeydown="if(event.key==='Enter') dwSubmitDelete()">
+          <span onclick="dwTogglePass(this)" title="Show / Hide"
+                style="position:absolute; right:10px; top:50%;
+                       transform:translateY(-50%); cursor:pointer; color:#aaa;">
+            <i id="dw-eye" class="fa fa-eye"></i>
+          </span>
+        </div>
+      </div>
+
+      <!-- Error box -->
+      <div id="dw-err"
+           style="display:none; background:#fde8e8; border-left:4px solid #dc3545;
+                  padding:8px 12px; border-radius:4px; font-size:12px;
+                  color:#a00; margin-bottom:14px;">
+        <i class="fa fa-times-circle me-1"></i>
+        <span id="dw-err-msg">Invalid username or password.</span>
+      </div>
+
+      <div class="d-flex gap-2">
+        <button onclick="dwBackToStep1()" type="button"
+                class="btn btn-secondary flex-fill">
+          <i class="fa fa-arrow-left me-1"></i>Back
+        </button>
+        <button onclick="dwSubmitDelete()" type="button"
+                id="dw-del-btn" class="btn btn-danger flex-fill">
+          <i class="fa fa-trash me-1"></i>Delete
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
+<!-- END MODAL -->
+
+{% endblock %}
+{% block scripts %}
+<script>
+/* ── Month filter: convert the picked "YYYY-MM" into a from/to date range
+       before the GET form submits, since the backend still filters on
+       from/to dates. ─────────────────────────────────────────────────── */
+function dwPrepareMonthFilter() {
+    const val = document.getElementById("dw-month-input").value; // "YYYY-MM"
+    if (!val) {
+        alert("Please select a month first.");
+        return false;
+    }
+    const [y, m] = val.split("-").map(Number);
+    const firstDay = `${val}-01`;
+    const lastDateNum = new Date(y, m, 0).getDate(); // last day of that month
+    const lastDay = `${val}-${String(lastDateNum).padStart(2, "0")}`;
+
+    document.getElementById("dw-filter-from").value = firstDay;
+    document.getElementById("dw-filter-to").value   = lastDay;
+    return true;
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    const monthInput  = document.getElementById("dw-month-input");
+    const currentFrom = document.getElementById("dw-filter-from").value; // e.g. "2026-06-01"
+
+    if (currentFrom) {
+        // A month is already applied (page was loaded/reloaded with from/to
+        // set) — just reflect that month in the picker.
+        monthInput.value = currentFrom.slice(0, 7); // "YYYY-MM"
+        return;
+    }
+
+    // No filter applied yet (very first visit) — default to the CURRENT
+    // month and reload immediately with that month's range, so the table
+    // never shows an unfiltered mix of every month at once.
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    const monthVal = `${y}-${m}`;
+    monthInput.value = monthVal;
+
+    const firstDay     = `${monthVal}-01`;
+    const lastDateNum  = new Date(y, now.getMonth() + 1, 0).getDate();
+    const lastDay      = `${monthVal}-${String(lastDateNum).padStart(2, "0")}`;
+
+    const params = new URLSearchParams(window.location.search);
+    params.set("from", firstDay);
+    params.set("to", lastDay);
+    window.location.replace(window.location.pathname + "?" + params.toString());
+});
+
+/* ── Delete modal ─────────────────────────────────────── */
+let _pendingFormId = null;
+
+function dwAskDelete(dateIso, dateDisplay) {
+    _pendingFormId = "dwdel-" + dateIso;
+    document.getElementById("dw-modal-datelabel").textContent = dateDisplay;
+    _resetModal();
+    document.getElementById("dw-delete-backdrop").style.display = "flex";
+}
+
+function dwCloseModal() {
+    document.getElementById("dw-delete-backdrop").style.display = "none";
+    _pendingFormId = null;
+}
+
+// close on backdrop click
+document.getElementById("dw-delete-backdrop").addEventListener("click", function(e){
+    if (e.target === this) dwCloseModal();
+});
+
+function _resetModal() {
+    document.getElementById("dw-step1").style.display = "block";
+    document.getElementById("dw-step2").style.display = "none";
+    document.getElementById("dw-err").style.display   = "none";
+    document.getElementById("dw-del-user").value = "";
+    document.getElementById("dw-del-pass").value = "";
+    const btn = document.getElementById("dw-del-btn");
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa fa-trash me-1"></i>Delete';
+}
+
+function dwShowLogin() {
+    document.getElementById("dw-step1").style.display = "none";
+    document.getElementById("dw-step2").style.display = "block";
+    document.getElementById("dw-err").style.display   = "none";
+    setTimeout(() => document.getElementById("dw-del-user").focus(), 80);
+}
+
+function dwBackToStep1() {
+    document.getElementById("dw-step1").style.display = "block";
+    document.getElementById("dw-step2").style.display = "none";
+}
+
+function dwTogglePass(el) {
+    const inp = document.getElementById("dw-del-pass");
+    const ico = document.getElementById("dw-eye");
+    if (inp.type === "password") {
+        inp.type = "text";
+        ico.className = "fa fa-eye-slash";
+    } else {
+        inp.type = "password";
+        ico.className = "fa fa-eye";
+    }
+}
+
+function dwSubmitDelete() {
+    const username = document.getElementById("dw-del-user").value.trim();
+    const password = document.getElementById("dw-del-pass").value.trim();
+    const errBox   = document.getElementById("dw-err");
+    const errMsg   = document.getElementById("dw-err-msg");
+    const btn      = document.getElementById("dw-del-btn");
+
+    if (!username || !password) {
+        errMsg.textContent = "Please enter username and password.";
+        errBox.style.display = "block";
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin me-1"></i>Verifying…';
+    errBox.style.display = "none";
+
+    // Save form id before any async work
+    const formId = _pendingFormId;
+
+    fetch("/api/verify-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: username, password: password })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) {
+            // Close modal first, then submit
+            document.getElementById("dw-delete-backdrop").style.display = "none";
+            _pendingFormId = null;
+            // Small delay so modal hides cleanly before navigation
+            setTimeout(() => {
+                document.getElementById(formId).submit();
+            }, 100);
+        } else {
+            errMsg.textContent = data.message || "Invalid username or password.";
+            errBox.style.display = "block";
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa fa-trash me-1"></i>Delete';
+            document.getElementById("dw-del-pass").value = "";
+            document.getElementById("dw-del-pass").focus();
+        }
+    })
+    .catch(() => {
+        errMsg.textContent = "Server error. Please try again.";
+        errBox.style.display = "block";
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa fa-trash me-1"></i>Delete';
+    });
+}
+</script>
+{% endblock %}

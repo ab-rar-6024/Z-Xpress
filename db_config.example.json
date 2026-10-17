@@ -1,0 +1,17 @@
+{
+  "backend": "mysql",
+
+  "postgres": {
+    "url": "postgresql://postgres.<PROJECT-REF>:<YOUR-PASSWORD>@aws-1-<region>.pooler.supabase.com:5432/postgres",
+    "pool_size": 4,
+    "connect_timeout": 15
+  },
+
+  "mysql": {
+    "host": "localhost",
+    "port": 3306,
+    "user": "root",
+    "password": "",
+    "database": "booking_system"
+  }
+}

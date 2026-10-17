@@ -1,0 +1,160 @@
+/* GLOBAL */
+html, body {
+    height: 100%;
+}
+
+body {
+    background: #f4f6f9;
+    margin: 0;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+/* SIDEBAR */
+.sidebar {
+    width: 250px;
+    background: #212529;
+    color: white;
+    transition: width 0.3s ease;
+    overflow-x: hidden;
+    min-height: 100vh;
+}
+
+.sidebar.collapsed {
+    width: 70px;
+}
+
+.sidebar-header {
+    padding: 15px;
+    text-align: center;
+    font-weight: bold;
+    border-bottom: 1px solid #444;
+}
+
+.sidebar a {
+    display: flex;
+    align-items: center;
+    padding: 12px 15px;
+    color: #ddd;
+    text-decoration: none;
+    transition: background 0.2s;
+}
+
+.sidebar a:hover {
+    background: #343a40;
+    color: #fff;
+}
+
+.sidebar a.active {
+    background: #0d6efd;
+    color: #fff;
+}
+
+.sidebar i {
+    width: 30px;
+    text-align: center;
+}
+
+/* Hide text when sidebar is collapsed */
+.sidebar.collapsed span,
+.sidebar.collapsed .logo-text {
+    display: none;
+}
+
+/* MAIN CONTENT */
+.content {
+    background: #f4f6f9;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+/* HEADER */
+.header {
+    background: #ffffff;
+    padding: 10px 20px;
+    border-bottom: 1px solid #ddd;
+    flex-shrink: 0;
+}
+
+/* PAGE BODY (content area) */
+.content .flex-grow-1 {
+    flex: 1 1 auto;
+}
+
+/* FOOTER (ALWAYS AT BOTTOM) */
+.footer {
+    background: #ffffff;
+    padding: 8px 15px;
+    border-top: 1px solid #ddd;
+    font-size: 13px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+/* ── AUTOCOMPLETE ───────────────────────────────── */
+.ac-wrap {
+    position: relative;
+}
+
+.ac-drop {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 1055;
+    background: #fff;
+    border: 1px solid #0d6efd;
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    max-height: 220px;
+    overflow-y: auto;
+    box-shadow: 0 4px 16px rgba(0,0,0,.12);
+}
+
+.ac-drop.open {
+    display: block;
+}
+
+.ac-item {
+    padding: 7px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background .1s;
+}
+
+.ac-item:hover,
+.ac-item.hi {
+    background: #e8f0fe;
+    color: #0d6efd;
+}
+
+.ac-sub {
+    font-size: 11px;
+    color: #888;
+}
+
+/* ── RATE INFO BAR ──────────────────────────────── */
+#rate-info {
+    font-size: 12px;
+    color: #198754;
+    margin-top: 4px;
+    min-height: 18px;
+}
+#rate-info.warn {
+    color: #dc3545;
+}
+
+/* ── ACTION BUTTONS IN TABLE ─────────────────────── */
+.btn-act {
+    font-size: 11px;
+    padding: 2px 8px;
+    margin: 1px;
+    white-space: nowrap;
+}
+
+/* ── EDIT MODE HIGHLIGHT ─────────────────────────── */
+.editing-row td {
+    background: #fff3cd !important;
+}

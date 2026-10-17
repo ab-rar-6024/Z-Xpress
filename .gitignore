@@ -1,0 +1,39 @@
+# ---- SECRETS (never commit) ----
+db_config.json
+remembered_login.dat
+.installed
+*.pem
+*.key
+.env
+
+# ---- customer data / backups ----
+db_backups/
+backups/
+*.sql
+!mysql_schema.sql
+!supabase_schema.sql
+!schema.sql
+xampp_rescue_*.zip
+xampp_data_before_repair_*.zip
+
+# ---- build output and big folders ----
+dist/
+dist_*/
+build/
+build_*/
+build_venv/
+venv/
+.venv/
+*.exe
+*.zip
+*.spec.bak
+
+# ---- Python / local noise ----
+__pycache__/
+*.pyc
+*.log
+keepalive.log
+.pytest_cache/
+.idea/
+.vscode/
+Thumbs.db

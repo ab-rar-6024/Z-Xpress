@@ -1,0 +1,482 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<h4 class="mb-3">
+    Rate Entry
+    {% if role == 'admin' %}
+    <span class="badge bg-danger ms-2" style="font-size:0.65rem;vertical-align:middle">ADMIN</span>
+    {% else %}
+    <span class="badge bg-primary ms-2" style="font-size:0.65rem;vertical-align:middle">USER – Add Only</span>
+    {% endif %}
+</h4>
+
+<div class="d-flex justify-content-between mb-4">
+    <form method="get" class="d-flex gap-2">
+        <input type="text" name="search" value="{{ search }}"
+               class="form-control form-control-sm" placeholder="Search code / place…" style="width:220px">
+        <button class="btn btn-sm btn-primary">Search</button>
+        {% if search %}
+        <a href="{{ url_for('rate_entry', limit=limit, page=1) }}" class="btn btn-sm btn-secondary">Clear</a>
+        {% endif %}
+    </form>
+
+    <div class="d-flex gap-2 align-items-center">
+        <div class="d-flex align-items-center gap-1">
+            <label class="small">Show:</label>
+            <select name="limit" id="limit-select" class="form-select form-select-sm" style="width:auto;">
+                <option value="10"  {% if limit == '10'  %}selected{% endif %}>10</option>
+                <option value="20"  {% if limit == '20'  %}selected{% endif %}>20</option>
+                <option value="100" {% if limit == '100' %}selected{% endif %}>100</option>
+                <option value="500" {% if limit == '500' %}selected{% endif %}>500</option>
+                <option value="all" {% if limit == 'all' %}selected{% endif %}>All</option>
+            </select>
+        </div>
+        {% if role == 'admin' %}
+        <a href="/rate-export" class="btn btn-success btn-sm">
+            <i class="fa fa-file-excel"></i> Export to Excel
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- ENTRY FORM -->
+<div class="card p-3 mb-4 {% if role != 'admin' %}border-primary{% endif %}">
+<form method="post" id="rate-form">
+<input type="hidden" name="_action" id="rate-action" value="add">
+<input type="hidden" name="edit_id" id="rate-edit-id" value="">
+<input type="hidden" name="zone" id="r-zone" value="">
+
+<!-- ROW 1: CODE, COMPANY NAME, PLACE -->
+<div class="row g-2 mb-2">
+    <div class="col-md-2">
+        <label class="form-label mb-1">CODE</label>
+        <div class="ac-wrap">
+            <input name="code" id="r-code" class="form-control" placeholder="e.g. MAS" required
+                   autocomplete="off">
+            <div class="ac-drop" id="r-code-drop"></div>
+        </div>
+    </div>
+
+    <div class="col-md-5">
+        <label class="form-label mb-1">CODE FULLFORM</label>
+        <input name="code_fullform" id="r-fullform" class="form-control"
+               placeholder="Full company name" required autocomplete="off">
+    </div>
+
+    <div class="col-md-3">
+        <label class="form-label mb-1">PLACE</label>
+        <div class="ac-wrap">
+            <input name="place" id="r-place" class="form-control"
+                   placeholder="e.g. CHENNAI" required autocomplete="off"
+                   oninput="onPlaceInput(this.value)"
+                   onblur="onPlaceBlur(this.value)"
+                   onkeydown="onPlaceKeydown(event)">
+            <div class="ac-drop" id="r-place-drop"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ROW 2: RATE SLABS + FSC + SAVE -->
+<div class="row g-2 align-items-end">
+    <div class="col-md-1">
+        <label class="form-label mb-1 small fw-semibold">250 GMS</label>
+        <input name="rate_250g" id="r-250g" type="number" step="0.01" class="form-control" value="">
+    </div>
+    <div class="col-md-1">
+        <label class="form-label mb-1 small fw-semibold">500 GMS</label>
+        <input name="rate_500g" id="r-500g" type="number" step="0.01" class="form-control" value="">
+    </div>
+    <div class="col-md-1">
+        <label class="form-label mb-1 small fw-semibold">1 KG</label>
+        <input name="rate_500g_1" id="r-500g1" type="number" step="0.01" class="form-control" value="">
+    </div>
+    <div class="col-md-2">
+        <label class="form-label mb-1 small fw-semibold">ABV 1KG/KG</label>
+        <input name="rate_1_to_3kg" id="r-1to3" type="number" step="0.01" class="form-control" value="">
+    </div>
+    <div class="col-md-2">
+        <label class="form-label mb-1 small fw-semibold">ABV 3KG/KG</label>
+        <input name="rate_3_to_10kg" id="r-3to10" type="number" step="0.01" class="form-control" value="">
+    </div>
+    <div class="col-md-2">
+        <label class="form-label mb-1 small fw-semibold">ABV 10KG/KG</label>
+        <input name="rate_above_10kg" id="r-10kg" type="number" step="0.01" class="form-control" value="">
+    </div>
+    <div class="col-md-1">
+        <label class="form-label mb-1 small fw-semibold">FSC %</label>
+        <input name="fuel" id="r-fuel" type="number" step="0.01" class="form-control" placeholder="e.g. 12">
+    </div>
+
+    <div class="col-md-2 d-flex align-items-end gap-1">
+        <button type="submit" class="btn btn-success flex-fill" id="rate-submit-btn">
+            <i class="fa fa-save"></i> <span id="r-save-lbl">Save</span>
+        </button>
+        {% if role == 'admin' %}
+        <button type="button" class="btn btn-secondary" id="r-cancel-btn"
+                style="display:none" onclick="rateCancel()">✕</button>
+        {% endif %}
+    </div>
+</div>
+
+</form>
+</div>
+
+{% if search %}
+<!-- SEARCH RESULTS INFO -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <small class="text-muted">
+        <i class="fa fa-search me-1"></i>
+        Showing <strong>{{ total }}</strong> result{{ 's' if total != 1 else '' }} for
+        <span class="badge bg-secondary">{{ search }}</span>
+    </small>
+    {% if limit != 'all' and total_pages > 1 %}
+    <nav>
+        <ul class="pagination pagination-sm mb-0">
+            <li class="page-item {% if page == 1 %}disabled{% endif %}">
+                <a class="page-link" href="{{ url_for('rate_entry', search=search, limit=limit, page=page-1) if page > 1 else '#' }}">&laquo;</a>
+            </li>
+            {% for p in range(1, total_pages+1) %}
+                {% if p == page %}
+                <li class="page-item active"><span class="page-link">{{ p }}</span></li>
+                {% elif p <= 3 or p > total_pages-3 or (p >= page-2 and p <= page+2) %}
+                <li class="page-item"><a class="page-link" href="{{ url_for('rate_entry', search=search, limit=limit, page=p) }}">{{ p }}</a></li>
+                {% elif p == 4 and page > 4 %}
+                <li class="page-item disabled"><span class="page-link">…</span></li>
+                {% endif %}
+            {% endfor %}
+            <li class="page-item {% if page == total_pages %}disabled{% endif %}">
+                <a class="page-link" href="{{ url_for('rate_entry', search=search, limit=limit, page=page+1) if page < total_pages else '#' }}">&raquo;</a>
+            </li>
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+
+<!-- TABLE — only shown when search is active -->
+<div class="card p-3">
+<table class="table table-bordered table-striped table-sm">
+<thead class="table-dark">
+<tr>
+    <th>#</th><th>Code</th><th>Code FullForm</th><th>Place</th><th>Zone</th>
+    <th>250 GMS</th><th>500 GMS</th><th>1 KG</th>
+    <th>ABV 1KG/KG</th><th>ABV 3KG/KG</th><th>ABV 10KG/KG</th>
+    <th>FSC %</th>
+    {% if role == 'admin' %}<th>Action</th>{% endif %}
+</tr>
+</thead>
+<tbody>
+{% for r in rates %}
+<tr id="rrow-{{ r.id }}">
+    <td>{{ loop.index + ((page-1) * (limit|int if limit != 'all' else 0)) }}</td>
+    <td style="background:#dbeafe; color:#1e40af; font-weight:700; text-align:center;">
+        <span style="background:#1e40af; color:#fff; padding:2px 8px; border-radius:12px; font-size:12px;">
+            {{ r.code }}
+        </span>
+    </td>
+    <td style="background:#fef9c3; color:#854d0e; font-weight:600;">{{ r.code_fullform }}</td>
+    <td>{{ r.place }}</td>
+    <td>
+        {% set zone_labels = {1:'Z1',2:'Z2',3:'Z3',4:'Z4',5:'Z5'} %}
+        {% set zone_colors = {1:'primary',2:'success',3:'warning',4:'danger',5:'secondary'} %}
+        <span class="badge bg-{{ zone_colors.get(r.zone, 'secondary') }}">
+            {{ zone_labels.get(r.zone, r.zone) }}
+        </span>
+    </td>
+    <td>{{ r.rate_250g }}</td>
+    <td>{{ r.rate_500g }}</td>
+    <td>{{ r.rate_500g_1 }}</td>
+    <td>{{ r.rate_1_to_3kg }}</td>
+    <td>{{ r.rate_3_to_10kg }}</td>
+    <td>{{ r.rate_above_10kg }}</td>
+    <td>
+        {% if r.fuel is not none and r.fuel != '' %}
+            <span class="badge bg-info text-dark">{{ r.fuel }}%</span>
+        {% else %}
+            <span class="text-muted">—</span>
+        {% endif %}
+    </td>
+    {% if role == 'admin' %}
+    <td>
+        <button class="btn btn-warning btn-act btn-sm" onclick='rateEdit({{ r|tojson }})'>
+            <i class="fa fa-pen"></i>
+        </button>
+        <button class="btn btn-info btn-act btn-sm text-white" onclick='rateCopy({{ r|tojson }})'>
+            <i class="fa fa-copy"></i>
+        </button>
+        <form method="post" id="rdel-{{ r.id }}" style="display:inline">
+            <input type="hidden" name="_action" value="delete">
+            <input type="hidden" name="del_id"  value="{{ r.id }}">
+            <button type="button" class="btn btn-danger btn-act btn-sm"
+                    onclick="confirmDel('rdel-{{ r.id }}')">
+                <i class="fa fa-trash"></i>
+            </button>
+        </form>
+    </td>
+    {% endif %}
+</tr>
+{% else %}
+<tr>
+    <td colspan="{{ 13 if role == 'admin' else 12 }}" class="text-center text-muted py-3">
+        <i class="fa fa-search me-1"></i> No records found for "{{ search }}"
+    </td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+
+{% else %}
+<!-- NO SEARCH — show hint -->
+<div class="text-center text-muted py-5">
+    <i class="fa fa-search fa-2x mb-2 d-block" style="opacity:0.3"></i>
+    <small>Use the search box above to find rate entries by code or company name.</small>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const IS_ADMIN = {{ 'true' if role == 'admin' else 'false' }};
+let isSubmitting = false;
+
+// ======================= ZONE DETECTION =======================
+function getZoneAndCorrectedPlace(originalPlace) {
+    if (!originalPlace) return { zoneNum: null, correctedPlace: originalPlace };
+    const p = originalPlace.trim().toUpperCase();
+    if (p === "CHENNAI") return { zoneNum: 1, correctedPlace: "CHENNAI" };
+    if (p === "TAMIL NADU" || p === "TAMILNADU") return { zoneNum: 2, correctedPlace: "TAMIL NADU" };
+    const southKw = ["KERALA","KARNATAKA","ANDHRA PRADESH","ANDHRA","TELANGANA","SOUTH"];
+    if (southKw.some(kw => p === kw || p.includes(kw) || kw.includes(p)))
+        return { zoneNum: 3, correctedPlace: "SOUTH" };
+    const northKw = ["DELHI","NEW DELHI","MUMBAI","KOLKATA","CALCUTTA","NORTH"];
+    if (northKw.some(kw => p === kw || p.includes(kw) || kw.includes(p)))
+        return { zoneNum: 4, correctedPlace: "NORTH" };
+    return { zoneNum: 5, correctedPlace: originalPlace.trim().toUpperCase() };
+}
+
+function applyZone(zoneNum) {
+    document.getElementById("r-zone").value = zoneNum || "";
+}
+
+function updatePlaceAndZone() {
+    const pi = document.getElementById("r-place");
+    const { zoneNum, correctedPlace } = getZoneAndCorrectedPlace(pi.value);
+    if (correctedPlace && correctedPlace !== pi.value) pi.value = correctedPlace;
+    applyZone(zoneNum);
+}
+
+function onPlaceBlur(val)  { updatePlaceAndZone(); }
+function onPlaceKeydown(e) {
+    if (e.key === "Enter") { e.preventDefault(); updatePlaceAndZone(); }
+    if (e.key === "Tab")   { updatePlaceAndZone(); }
+}
+function setPlaceAndZone(v) {
+    document.getElementById("r-place").value = v;
+    updatePlaceAndZone();
+}
+
+// ======================= AUTOCOMPLETE =======================
+function bindAC(input, url, onSelect, labelFn, subFn) {
+    if (!input) return;
+    let parent = input.parentNode;
+    let drop = parent.querySelector(".ac-drop");
+    if (!drop) {
+        drop = document.createElement("div");
+        drop.className = "ac-drop";
+        parent.appendChild(drop);
+    }
+    let timer, hi = -1;
+    function closeMe() { drop.classList.remove("open"); hi = -1; }
+    function render(items) {
+        if (!items.length) { closeMe(); return; }
+        drop.innerHTML = ""; hi = 0;
+        items.forEach((item, i) => {
+            const div = document.createElement("div");
+            div.className = "ac-item" + (i === 0 ? " hi" : "");
+            const lbl = labelFn ? labelFn(item) : String(item);
+            const sub = subFn   ? subFn(item)   : "";
+            div.innerHTML = `<strong>${escapeHtml(lbl)}</strong>` +
+                (sub ? `<div class="ac-sub">${escapeHtml(sub)}</div>` : "");
+            div.addEventListener("mousedown", e => { e.preventDefault(); onSelect(item); closeMe(); });
+            drop.appendChild(div);
+        });
+        drop.classList.add("open");
+        document.querySelectorAll(".ac-drop.open").forEach(d => { if (d !== drop) d.classList.remove("open"); });
+    }
+    function moveHi(d) {
+        const els = drop.querySelectorAll(".ac-item");
+        if (!els.length) return;
+        if (hi >= 0) els[hi]?.classList.remove("hi");
+        hi = Math.max(0, Math.min(els.length - 1, (hi < 0 ? 0 : hi) + d));
+        els[hi]?.classList.add("hi");
+        els[hi]?.scrollIntoView({ block: "nearest" });
+    }
+    input.addEventListener("input", () => {
+        clearTimeout(timer);
+        const q = input.value.trim();
+        if (!q) { closeMe(); return; }
+        timer = setTimeout(async () => {
+            try { render(await fetch(url + encodeURIComponent(q)).then(r => r.json())); }
+            catch(e) { console.error(e); }
+        }, 80);
+    });
+    input.addEventListener("keydown", e => {
+        if (!drop.classList.contains("open")) return;
+        if      (e.key === "ArrowDown") { e.preventDefault(); moveHi(1); }
+        else if (e.key === "ArrowUp")   { e.preventDefault(); moveHi(-1); }
+        else if (e.key === "Enter")     {
+            const h = drop.querySelector(".ac-item.hi");
+            if (h) { e.preventDefault(); e.stopImmediatePropagation(); h.dispatchEvent(new MouseEvent("mousedown")); }
+        }
+        else if (e.key === "Escape") closeMe();
+    });
+    input.addEventListener("blur", () => setTimeout(closeMe, 160));
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
+}
+
+// ======================= TABLE ACTIONS =======================
+function rateEdit(r) {
+    if (!IS_ADMIN) return;
+    document.getElementById("rate-action").value  = "edit";
+    document.getElementById("rate-edit-id").value = r.id;
+    document.getElementById("r-code").value       = r.code;
+    document.getElementById("r-fullform").value   = r.code_fullform;
+    document.getElementById("r-place").value      = r.place;
+    document.getElementById("r-250g").value       = r.rate_250g;
+    document.getElementById("r-500g").value       = r.rate_500g;
+    document.getElementById("r-500g1").value      = r.rate_500g_1;
+    document.getElementById("r-1to3").value       = r.rate_1_to_3kg;
+    document.getElementById("r-3to10").value      = r.rate_3_to_10kg;
+    document.getElementById("r-10kg").value       = r.rate_above_10kg;
+    document.getElementById("r-fuel").value       = r.fuel ?? "";
+    if (r.zone) applyZone(r.zone); else updatePlaceAndZone();
+    document.getElementById("r-save-lbl").textContent = "Update";
+    const cancelBtn = document.getElementById("r-cancel-btn");
+    if (cancelBtn) cancelBtn.style.display = "inline-block";
+    document.querySelectorAll(".editing-row").forEach(e => e.classList.remove("editing-row"));
+    document.getElementById("rrow-" + r.id)?.classList.add("editing-row");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    document.getElementById("r-code").focus();
+}
+
+function rateCopy(r) {
+    if (!IS_ADMIN) return;
+    rateEdit(r);
+    document.getElementById("rate-action").value      = "add";
+    document.getElementById("rate-edit-id").value     = "";
+    document.getElementById("r-place").value          = "";
+    document.getElementById("r-zone").value           = "";
+    document.getElementById("r-fuel").value           = r.fuel ?? "";
+    document.getElementById("r-save-lbl").textContent = "Save";
+    document.getElementById("r-place").focus();
+}
+
+function rateCancel() {
+    document.getElementById("rate-action").value  = "add";
+    document.getElementById("rate-edit-id").value = "";
+    ["r-code","r-fullform","r-place"].forEach(id => document.getElementById(id).value = "");
+    ["r-250g","r-500g","r-500g1","r-1to3","r-3to10","r-10kg","r-fuel"]
+        .forEach(id => document.getElementById(id).value = "");
+    document.getElementById("r-zone").value = "";
+    document.getElementById("r-save-lbl").textContent = "Save";
+    const cancelBtn = document.getElementById("r-cancel-btn");
+    if (cancelBtn) cancelBtn.style.display = "none";
+    document.querySelectorAll(".editing-row").forEach(e => e.classList.remove("editing-row"));
+}
+
+function confirmDel(formId) {
+    if (!IS_ADMIN) return;
+    if (confirm("Delete this rate entry?")) document.getElementById(formId).submit();
+}
+
+// ======================= LIMIT SELECT =======================
+document.getElementById('limit-select').addEventListener('change', function() {
+    const url = new URL(window.location.href);
+    url.searchParams.set('limit', this.value);
+    url.searchParams.set('page', '1');
+    window.location.href = url.toString();
+});
+
+// ======================= FORM SUBMIT =======================
+const rateForm      = document.getElementById('rate-form');
+const submitBtn     = document.getElementById('rate-submit-btn');
+const saveLabelSpan = document.getElementById('r-save-lbl');
+
+if (rateForm) {
+    rateForm.addEventListener('submit', function(e) {
+        if (isSubmitting) { e.preventDefault(); return false; }
+        isSubmitting = true;
+        submitBtn.disabled = true;
+        const originalText = saveLabelSpan.innerText;
+        saveLabelSpan.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Saving...';
+        setTimeout(() => {
+            if (isSubmitting) {
+                isSubmitting = false;
+                submitBtn.disabled = false;
+                saveLabelSpan.innerHTML = originalText;
+            }
+        }, 10000);
+    });
+}
+
+// ======================= INIT =======================
+document.addEventListener("DOMContentLoaded", () => {
+    bindAC(
+        document.getElementById("r-code"),
+        "/api/ac/code?q=",
+        item => {
+            document.getElementById("r-code").value     = item.code;
+            document.getElementById("r-fullform").value = item.code_fullform;
+        },
+        item => item.code,
+        item => item.code_fullform
+    );
+    bindAC(
+        document.getElementById("r-place"),
+        "/api/ac/place?q=",
+        v => { setPlaceAndZone(v); },
+        v => v, null
+    );
+    updatePlaceAndZone();
+});
+</script>
+
+<style>
+.ac-drop { display:none; position:absolute; z-index:1000; background:#fff; border:1px solid #ccc; max-height:200px; overflow-y:auto; width:100%; }
+.ac-drop.open { display:block; }
+.ac-item { padding:6px 10px; cursor:pointer; border-bottom:1px solid #eee; }
+.ac-item.hi { background:#e0e8ff; }
+.ac-sub { font-size:11px; color:#6c757d; }
+.ac-wrap { position:relative; }
+.editing-row { background:#fff8dc !important; outline:2px solid #ffc107; }
+#rate-form .row { padding-bottom: 4px; }
+#rate-form .row + .row { border-top: 1px dashed #dee2e6; padding-top: 8px; }
+
+/* NEW: darker grid lines around each cell in the rate table */
+.table-bordered {
+    border-color: #343a40 !important;
+}
+.table-bordered th,
+.table-bordered td {
+    border-color: #343a40 !important;
+}
+
+/* NEW: darker, more visible borders on every input/select box in the
+   Rate Entry form — the default Bootstrap border (#ced4da) was too
+   light to see clearly. */
+#rate-form .form-control,
+#rate-form .form-select {
+    border: 1.5px solid #6c757d !important;
+}
+#rate-form .form-control:focus,
+#rate-form .form-select:focus {
+    border-color: #0d6efd !important;
+    box-shadow: 0 0 0 0.2rem rgba(13,110,253,.25) !important;
+}
+</style>
+{% endblock %}

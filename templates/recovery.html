@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>ZXpress - Database problem</title>
+    <link rel="icon" type="image/png" href="/static/img/favicon.png">
+<style>
+  body { font-family: Segoe UI, Arial, sans-serif; background:#1a1a2e; color:#e8e8f0; margin:0; padding:24px; }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  .sub { color:#9aa; margin-bottom: 18px; }
+  .box { background:#25253d; border-radius:8px; padding:16px 18px; margin-bottom:14px; }
+  .err { background:#4a1f26; border-left:4px solid #e74c3c; }
+  .ok  { color:#2ecc71; } .bad { color:#ff6b6b; } .muted { color:#9aa; font-size:13px; }
+  button { background:#1abc9c; color:#fff; border:0; border-radius:5px; padding:9px 14px; font-size:14px; cursor:pointer; margin:3px 6px 3px 0; }
+  button.alt { background:#3a3a5c; } button.warn { background:#e67e22; } button:disabled { opacity:.5; cursor:wait; }
+  input { padding:8px; border-radius:4px; border:1px solid #556; background:#15152a; color:#fff; margin:3px 6px 3px 0; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; } @media(max-width:700px){ .grid{grid-template-columns:1fr;} }
+  code { background:#15152a; padding:1px 5px; border-radius:3px; font-size:12px; word-break:break-all; }
+  #out { white-space:pre-wrap; margin-top:8px; font-size:13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>The database could not be reached</h1>
+  <div class="sub">ZXpress is set to use <b>{{ active_label }}</b>. Nothing is lost - pick an option below.</div>
+
+  {% if reason %}<div class="box err"><b>Details:</b> {{ reason }}</div>{% endif %}
+
+  <div class="grid">
+    <div class="box">
+      <b>XAMPP (MySQL)</b>
+      <div id="mysqlStatus" class="muted" style="margin:6px 0">checking...</div>
+      <button onclick="startMysql(this)">Start MySQL</button>
+      <div style="margin-top:8px">
+        <span class="muted">Use another port:</span><br>
+        <input id="port" type="number" min="1024" max="65535" style="width:100px">
+        <button class="alt" onclick="setPort(this)">Save &amp; start</button>
+      </div>
+    </div>
+    <div class="box">
+      <b>Supabase (online)</b>
+      <div id="pgStatus" class="muted" style="margin:6px 0">checking...</div>
+      <div class="muted">Needs an internet connection.</div>
+    </div>
+  </div>
+
+  <div class="box" id="repairBox">
+    <b>Repair XAMPP data</b>
+    <div id="diag" class="muted" style="margin:6px 0">checking what is wrong...</div>
+    <div class="muted">Fixes a damaged XAMPP data folder (&quot;MySQL shutdown unexpectedly&quot;). <b>Nothing is deleted</b>:
+      the data is zipped first, the old folder is kept, and everything is put back if the repair does not work. Takes 1-3 minutes.</div>
+    <label class="muted" style="display:block;margin:8px 0"><input type="checkbox" id="repairOk"> I understand - repair XAMPP's data folder</label>
+    <button class="warn" onclick="doRepair(this)">Repair XAMPP data</button>
+    <button class="alt" onclick="doRescue(this)">Create rescue file</button>
+    <div id="jobBox" style="display:none;margin-top:10px">
+      <div class="muted" id="jobMsg"></div>
+      <div style="background:#15152a;border-radius:6px;height:10px;overflow:hidden;margin:6px 0"><div id="jobBar" style="height:10px;width:0;background:#1abc9c"></div></div>
+    </div>
+    <div id="repairOut" style="margin-top:10px;font-size:13px"></div>
+  </div>
+
+  <div class="box">
+    <b>Switch to the other database</b>
+    <div class="muted" style="margin:6px 0">Switching does not copy data. The database you switch to may be older or newer than the one you were using -
+      check its latest booking date above. Both are backed up automatically. Administrator login required.</div>
+    <input id="u" placeholder="Admin username" autocomplete="off">
+    <input id="p" type="password" placeholder="Password" autocomplete="off"><br>
+    <button class="warn" id="swMysql" onclick="doSwitch('mysql', this)">Switch to XAMPP</button>
+    <button class="warn" id="swPg" onclick="doSwitch('postgres', this)">Switch to Supabase</button>
+  </div>
+
+  <div class="box">
+    <button onclick="location.href='/login'">Try again (open login)</button>
+    <button class="alt" onclick="load()">Re-check databases</button>
+    <div id="out"></div>
+  </div>
+</div>
+
+<script>
+let ST = null;
+const el = id => document.getElementById(id);
+function line(s){
+  if (!s.ok) return `<span class="bad">Not reachable</span> - ${(s.error||"").replace(/</g,"&lt;")}`;
+  return `<span class="ok">Connected</span> - ${s.tables.bookings} bookings, latest booking ${s.latest||"-"}`;
+}
+async function post(url, body){
+  try { const r = await fetch(url, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body||{})});
+        return await r.json(); } catch(e){ return {ok:false, error:String(e)}; }
+}
+async function load(){
+  el("mysqlStatus").textContent = "checking..."; el("pgStatus").textContent = "checking...";
+  try {
+    const r = await fetch("/recovery/status"); ST = await r.json();
+    el("mysqlStatus").innerHTML = line(ST.summaries.mysql) +
+      `<br>Port ${ST.mysql.port} &middot; ` + (ST.mysql.mysqld_found ? "XAMPP found" : "<span class='bad'>XAMPP not found on this PC</span>");
+    el("pgStatus").innerHTML = ST.supabase_configured ? line(ST.summaries.postgres) : "<span class='bad'>Not configured</span>";
+    el("port").value = ST.mysql.port;
+  } catch(e){ el("out").textContent = "Could not read status: " + e; }
+}
+async function startMysql(b){ b.disabled=true; el("out").textContent="Starting MySQL (up to 45 s)...";
+  const r = await post("/recovery/start-mysql"); el("out").textContent = r.message || r.error || "";
+  b.disabled=false; await load(); if (r.ok) setTimeout(()=>location.href="/login", 800); }
+async function setPort(b){ b.disabled=true; el("out").textContent="Saving port and starting MySQL...";
+  const r = await post("/recovery/port", {port: parseInt(el("port").value,10)}); el("out").textContent = r.message || r.error || "";
+  b.disabled=false; await load(); if (r.ok) setTimeout(()=>location.href="/login", 800); }
+async function doSwitch(to, b){
+  if (!el("u").value || !el("p").value){ el("out").textContent = "Enter the administrator username and password first."; return; }
+  b.disabled=true; el("out").textContent = "Checking login, backing up and switching (this can take a minute)...";
+  const r = await post("/recovery/switch", {to, username: el("u").value, password: el("p").value});
+  b.disabled=false;
+  if (r.ok){ el("out").textContent = "Switched. Opening login..."; setTimeout(()=>location.href="/login", 1200); }
+  else { el("out").textContent = "Not switched: " + (r.error || "unknown error"); }
+}
+load();
+// ---------------- XAMPP repair ----------------
+const esc = x => String(x ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+async function loadDiag(){
+  try {
+    const r = await (await fetch("/recovery/xampp/diagnose")).json();
+    el("diag").innerHTML = `<b>${esc(r.title)}</b><br>${esc(r.detail)}` +
+      (r.repairable === false ? '<br><span class="bad">A data repair will not help with this.</span>' : "");
+  } catch(e){ el("diag").textContent = "Could not check: " + e; }
+}
+async function runJob(url, body){
+  const r = await post(url, body);
+  if (!r.ok){ el("repairOut").innerHTML = '<span class="bad">' + esc(r.error || "could not start") + '</span>'; return null; }
+  el("jobBox").style.display = "block";
+  for (;;){
+    await new Promise(res => setTimeout(res, 1500));
+    let j; try { j = await (await fetch("/recovery/job")).json(); } catch(e){ continue; }   // server may be busy
+    el("jobMsg").textContent = j.message || ""; el("jobBar").style.width = (j.pct || 0) + "%";
+    if (j.state !== "running") return j;
+  }
+}
+function showRepair(j){
+  const r = j.result || {};
+  if (j.state === "error" || !r.status){ el("repairOut").innerHTML = '<span class="bad"><b>Problem:</b> ' + esc(j.error || r.message || "unknown") + '</span>'; return; }
+  const col = r.status === "ok" ? "ok" : r.status === "partial" ? "" : "bad";
+  const head = r.status === "ok" ? "Repaired" : r.status === "partial" ? "Recovered - please check the data" : "Not repaired";
+  let h = `<div class="${col}" style="font-size:15px"><b>${head}</b></div><div>${esc(r.message)}</div>`;
+  if (r.counts) h += `<div class="muted">Readable now: ${r.counts.bookings} bookings, ${r.counts.rates} rates, ${r.counts.zones} zones, ${r.counts.app_users} users.</div>`;
+  if (r.warnings && r.warnings.length) h += `<div class="bad">${r.warnings.map(esc).join("<br>")}</div>`;
+  if (r.attempts) h += "<div class='muted' style='margin-top:6px'>" + r.attempts.map(a => `${esc(a.name)}: ${a.ok ? "worked" : "did not work"}${a.detail ? " - " + esc(a.detail) : ""}`).join("<br>") + "</div>";
+  const keep = [r.zip && "Safety copy: " + r.zip, r.data_old && "Old data folder kept: " + r.data_old, r.dump && "Exported data: " + r.dump].filter(Boolean);
+  if (keep.length) h += "<div class='muted' style='margin-top:6px'>" + keep.map(esc).join("<br>") + "</div>";
+  h += `<div style="margin-top:8px"><button class="alt" onclick="openBackups()">Open the backups folder</button>` +
+       (r.status === "failed" ? ` <span class="muted">Use <b>Switch to Supabase</b> below to keep working.</span>` : "") + `</div>`;
+  el("repairOut").innerHTML = h;
+  if (r.status === "ok") setTimeout(() => location.href = "/login", 6000);
+}
+async function doRepair(b){
+  if (!el("repairOk").checked){ el("repairOut").innerHTML = '<span class="bad">Tick the box first.</span>'; return; }
+  b.disabled = true; el("repairOut").textContent = "Repairing - please do not close this window...";
+  const j = await runJob("/recovery/xampp/repair", {confirm: "REPAIR"});
+  b.disabled = false; if (j) showRepair(j); load(); loadDiag();
+}
+async function doRescue(b){
+  b.disabled = true; el("repairOut").textContent = "Creating the rescue file (can take a minute)...";
+  const j = await runJob("/recovery/xampp/rescue-file", {});
+  b.disabled = false;
+  if (!j) return;
+  const r = j.result || {};
+  el("repairOut").innerHTML = r.path
+    ? `<div class="ok"><b>Rescue file created</b> (${r.size_mb} MB)</div><div class="muted">${esc(r.path)}</div>
+       <div class="muted">Send this file to support.</div><div style="margin-top:8px"><button class="alt" onclick="openBackups()">Open the backups folder</button></div>`
+    : `<span class="bad">${esc(j.error || "failed")}</span>`;
+}
+async function openBackups(){ await post("/recovery/open-backups"); }
+loadDiag();
+</script>
+</body>
+</html>

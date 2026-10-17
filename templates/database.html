@@ -1,0 +1,578 @@
+{% extends "layout.html" %}
+{% block content %}
+<style>
+  .dbx { --dbx-ink:#1b2437; --dbx-mute:#6b7488; --dbx-line:#e6e9f0; --dbx-bg:#f5f7fb; }
+  .dbx-hero {
+    background: linear-gradient(120deg, #101b33 0%, #17315f 55%, #1e4a8c 100%);
+    color:#fff; border-radius:16px; padding:22px 26px; position:relative; overflow:hidden;
+    box-shadow:0 10px 30px rgba(16,27,51,.25);
+  }
+  .dbx-hero::after{ content:""; position:absolute; right:-60px; top:-70px; width:240px; height:240px; border-radius:50%;
+    background:radial-gradient(circle, rgba(79,209,255,.28), rgba(79,209,255,0) 70%); }
+  .dbx-hero h4{ margin:0; font-weight:700; letter-spacing:.2px; }
+  .dbx-hero .sub{ color:#b8c6e6; font-size:.9rem; }
+  .dbx-live{ display:inline-flex; align-items:center; gap:10px; background:rgba(255,255,255,.1);
+    border:1px solid rgba(255,255,255,.18); padding:8px 14px; border-radius:999px; font-weight:600; }
+  .dbx-dot{ width:10px; height:10px; border-radius:50%; background:#2ee59d; box-shadow:0 0 0 0 rgba(46,229,157,.7); animation:dbxpulse 1.8s infinite; }
+  .dbx-dot.off{ background:#ff6b6b; animation:none; }
+  @keyframes dbxpulse{ 0%{box-shadow:0 0 0 0 rgba(46,229,157,.6)} 70%{box-shadow:0 0 0 10px rgba(46,229,157,0)} 100%{box-shadow:0 0 0 0 rgba(46,229,157,0)} }
+  .dbx-btn-ghost{ background:rgba(255,255,255,.12); color:#fff; border:1px solid rgba(255,255,255,.25); }
+  .dbx-btn-ghost:hover{ background:rgba(255,255,255,.22); color:#fff; }
+
+  .dbx-sync{ border-radius:12px; padding:12px 16px; display:flex; gap:12px; align-items:center; font-size:.95rem; margin-top:16px; }
+  .dbx-sync.ok  { background:#e8f8f0; color:#0d6b43; border:1px solid #bfe9d3; }
+  .dbx-sync.diff{ background:#fff6e5; color:#8a5a00; border:1px solid #f6dca3; }
+  .dbx-sync.warn{ background:#fdecec; color:#9b2226; border:1px solid #f5c2c4; }
+  .dbx-sync i{ font-size:1.25rem; }
+
+  .dbx-card{ background:#fff; border:1px solid var(--dbx-line); border-radius:16px; box-shadow:0 4px 18px rgba(20,30,60,.06);
+    height:100%; transition:box-shadow .2s, transform .2s; overflow:hidden; }
+  .dbx-card:hover{ box-shadow:0 10px 28px rgba(20,30,60,.12); transform:translateY(-2px); }
+  .dbx-card.active{ border:2px solid #19b57a; box-shadow:0 8px 26px rgba(25,181,122,.18); }
+  .dbx-card-h{ display:flex; align-items:center; gap:14px; padding:18px 20px 12px; }
+  .dbx-ico{ width:48px; height:48px; border-radius:14px; display:grid; place-items:center; font-size:1.35rem; color:#fff; flex:none; }
+  .dbx-ico.mysql{ background:linear-gradient(135deg,#ff9a3c,#ff6a00); }
+  .dbx-ico.pg   { background:linear-gradient(135deg,#34d399,#0f9d6e); }
+  .dbx-name{ font-weight:700; font-size:1.1rem; color:var(--dbx-ink); line-height:1.1; }
+  .dbx-kind{ color:var(--dbx-mute); font-size:.82rem; }
+  .dbx-pill{ margin-left:auto; padding:5px 12px; border-radius:999px; font-size:.78rem; font-weight:700; letter-spacing:.3px; white-space:nowrap; }
+  .dbx-pill.use { background:#19b57a; color:#fff; }
+  .dbx-status{ display:inline-flex; align-items:center; gap:7px; font-size:.85rem; font-weight:600; padding:0 20px 6px; }
+  .dbx-status.ok{ color:#0f9d6e; } .dbx-status.idle{ color:#c27a00; } .dbx-status.bad{ color:#d6336c; }
+  .dbx-tiles{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; padding:8px 20px 14px; }
+  .dbx-tile{ background:var(--dbx-bg); border-radius:12px; padding:12px 14px; }
+  .dbx-tile .n{ font-size:1.55rem; font-weight:800; color:var(--dbx-ink); line-height:1.1; font-variant-numeric:tabular-nums; }
+  .dbx-tile .l{ font-size:.76rem; color:var(--dbx-mute); text-transform:uppercase; letter-spacing:.5px; margin-top:2px; }
+  .dbx-tile.big{ grid-column:1 / -1; background:linear-gradient(135deg,#eef4ff,#e3ecff); }
+  .dbx-tile.big .n{ font-size:2.1rem; color:#1c3d8f; }
+  .dbx-foot{ display:flex; justify-content:space-between; align-items:center; gap:10px; padding:12px 20px 18px; border-top:1px dashed var(--dbx-line); }
+  .dbx-foot .when{ font-size:.85rem; color:var(--dbx-mute); }
+  .dbx-foot .when b{ color:var(--dbx-ink); }
+  .dbx-err{ padding:6px 20px 18px; font-size:.88rem; color:var(--dbx-mute); }
+
+  .dbx-tool{ background:#fff; border:1px solid var(--dbx-line); border-radius:16px; height:100%; box-shadow:0 4px 18px rgba(20,30,60,.05); }
+  .dbx-tool-h{ display:flex; align-items:center; gap:10px; padding:16px 20px 4px; font-weight:700; color:var(--dbx-ink); }
+  .dbx-tool-h .ic{ width:34px; height:34px; border-radius:10px; display:grid; place-items:center; background:#eef2fb; color:#2c4fa3; }
+  .dbx-tool-b{ padding:8px 20px 18px; font-size:.9rem; color:var(--dbx-mute); }
+  .dbx-skel{ height:260px; border-radius:16px; background:linear-gradient(90deg,#eef1f7 25%,#f6f8fc 37%,#eef1f7 63%); background-size:400% 100%; animation:dbxsk 1.3s infinite; }
+  @keyframes dbxsk{ 0%{background-position:100% 50%} 100%{background-position:0 50%} }
+
+  /* ---- tool panels ---- */
+  .dbx-panel{ background:#fff; border:1px solid var(--dbx-line); border-radius:16px; height:100%; display:flex; flex-direction:column;
+    box-shadow:0 4px 18px rgba(20,30,60,.05); transition:box-shadow .2s, transform .2s; overflow:hidden; }
+  .dbx-panel:hover{ box-shadow:0 10px 26px rgba(20,30,60,.11); transform:translateY(-2px); }
+  .dbx-panel-h{ display:flex; align-items:center; gap:12px; padding:16px 18px 12px; border-bottom:1px solid var(--dbx-line); }
+  .dbx-panel-h .ic{ width:40px; height:40px; border-radius:12px; display:grid; place-items:center; font-size:1.05rem; flex:none; }
+  .dbx-panel-h .ic.blue  { background:#e8efff; color:#2c4fa3; }
+  .dbx-panel-h .ic.amber { background:#fff1dc; color:#c26a00; }
+  .dbx-panel-h .ic.violet{ background:#efe9ff; color:#6a42c2; }
+  .dbx-panel-h .ic.rose  { background:#ffe8ee; color:#c2335a; }
+  .dbx-panel-h .ti{ font-weight:700; color:var(--dbx-ink); line-height:1.15; }
+  .dbx-panel-h .su{ font-size:.78rem; color:var(--dbx-mute); }
+  .dbx-chip{ margin-left:auto; font-size:.72rem; font-weight:700; padding:4px 10px; border-radius:999px; white-space:nowrap; letter-spacing:.2px; }
+  .dbx-chip.ok  { background:#e3f7ee; color:#0d8a5b; }
+  .dbx-chip.idle{ background:#fff3d6; color:#a86400; }
+  .dbx-chip.bad { background:#fde4e8; color:#c0264b; }
+  .dbx-chip.off { background:#eef0f5; color:#6b7488; }
+  .dbx-panel-b{ padding:14px 18px; flex:1 1 auto; font-size:.88rem; color:var(--dbx-mute); }
+  .dbx-panel-f{ padding:12px 18px 16px; display:grid; gap:8px; background:linear-gradient(#fff, #fafbfe); border-top:1px dashed var(--dbx-line); }
+  .dbx-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
+  .dbx-row .k{ font-size:.74rem; text-transform:uppercase; letter-spacing:.5px; color:var(--dbx-mute); flex:none; }
+  .dbx-path{ font-family:Consolas,Menlo,monospace; font-size:.76rem; background:var(--dbx-bg); border-radius:8px; padding:4px 8px; color:#a2305a;
+    max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; direction:rtl; text-align:left; }
+  .dbx-list{ list-style:none; padding:0; margin:0; }
+  .dbx-list li{ display:flex; gap:10px; align-items:flex-start; margin-bottom:10px; color:#4a546b; }
+  .dbx-list li i{ width:22px; text-align:center; color:#2c4fa3; margin-top:2px; }
+  .dbx-note{ background:var(--dbx-bg); border-radius:10px; padding:8px 10px; font-size:.8rem; }
+  .dbx-msg{ margin-top:8px; font-size:.84rem; }
+  .dbx-panel .btn{ border-radius:10px; font-weight:600; }
+
+  .dbx-grid4{ display:grid; grid-template-columns:1fr; gap:16px; }
+  @media (min-width: 1000px){ .dbx-grid4{ grid-template-columns:repeat(2, minmax(0, 1fr)); } }
+  @media (min-width: 1760px){ .dbx-grid4{ grid-template-columns:repeat(4, minmax(0, 1fr)); } }
+  .dbx-panel-h > div{ min-width:0; }
+</style>
+
+<div class="dbx">
+
+<!-- ============ hero ============ -->
+<div class="dbx-hero">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3" style="position:relative;z-index:1">
+        <div>
+            <h4><i class="fa fa-server me-2"></i>Database Control Center</h4>
+            <div class="sub">Live status of your XAMPP and Supabase databases &middot; <span id="refreshed">loading...</span></div>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <div class="dbx-live"><span class="dbx-dot" id="liveDot"></span>
+                <span>Running on <b id="activeBadge">{{ active_label }}</b></span></div>
+            <button class="btn btn-sm dbx-btn-ghost" onclick="loadStatus()"><i class="fa fa-rotate me-1"></i> Refresh</button>
+        </div>
+    </div>
+</div>
+
+<div id="syncStrip"></div>
+<div id="msg" class="mt-3"></div>
+
+<!-- ============ job progress ============ -->
+<div id="jobBox" class="dbx-card mt-3 d-none" style="height:auto">
+    <div class="p-3">
+        <div class="d-flex justify-content-between mb-1"><strong id="jobTitle">Working...</strong><span id="jobPct"></span></div>
+        <div class="progress mb-2" style="height:10px"><div id="jobBar" class="progress-bar progress-bar-striped progress-bar-animated" style="width:0%"></div></div>
+        <div id="jobMsg" class="small text-muted"></div>
+        <div id="jobResult" class="small mt-2"></div>
+    </div>
+</div>
+
+<!-- ============ the two databases ============ -->
+<div class="row g-3 mt-1" id="dbCards">
+    <div class="col-lg-6"><div class="dbx-skel"></div></div>
+    <div class="col-lg-6"><div class="dbx-skel"></div></div>
+</div>
+
+<!-- ============ tools ============ -->
+<div class="dbx-grid4 mt-3 mb-4">
+
+    <!-- XAMPP / MySQL -->
+    <div>
+        <div class="dbx-panel">
+            <div class="dbx-panel-h">
+                <span class="ic blue"><i class="fa fa-plug"></i></span>
+                <div><div class="ti">XAMPP / MySQL</div><div class="su">Local database server</div></div>
+                <span class="dbx-chip off" id="mysqlChip">checking</span>
+            </div>
+            <div class="dbx-panel-b">
+                <div class="dbx-row"><span class="k">Location</span><span class="dbx-path" id="mysqlPath" title="">...</span></div>
+                <div class="dbx-row mb-2"><span class="k">Port</span>
+                    <div class="input-group input-group-sm" style="max-width:230px">
+                        <input id="portInput" type="number" class="form-control" min="1024" max="65535">
+                        <button class="btn btn-outline-primary" onclick="savePort()">Save &amp; restart</button>
+                    </div>
+                </div>
+                <div class="dbx-note">Apache and ports 80/443 are not needed. If the port is busy, MySQL starts on the next free port.</div>
+                <div id="mysqlMsg" class="dbx-msg"></div>
+            </div>
+            <div class="dbx-panel-f">
+                <button class="btn btn-success" onclick="startMysql(this)"><i class="fa fa-play me-1"></i> Start MySQL</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Repair & rescue -->
+    <div>
+        <div class="dbx-panel">
+            <div class="dbx-panel-h">
+                <span class="ic amber"><i class="fa fa-screwdriver-wrench"></i></span>
+                <div><div class="ti">Repair &amp; rescue</div><div class="su">XAMPP won't start?</div></div>
+            </div>
+            <div class="dbx-panel-b">
+                <p class="mb-2">Fixes <b>&ldquo;MySQL shutdown unexpectedly&rdquo;</b> after a power cut or a bad close.</p>
+                <ul class="dbx-list">
+                    <li><i class="fa fa-file-zipper"></i><span>The data is <b>zipped first</b> as a safety copy.</span></li>
+                    <li><i class="fa fa-folder-open"></i><span>The old folder is <b>kept</b>, never deleted.</span></li>
+                    <li><i class="fa fa-rotate-left"></i><span>Everything is <b>rolled back</b> if the repair fails.</span></li>
+                </ul>
+                <div id="xfMsg" class="dbx-msg"></div>
+            </div>
+            <div class="dbx-panel-f">
+                <button class="btn btn-warning" onclick="xfRepair()"><i class="fa fa-wrench me-1"></i> Repair XAMPP data</button>
+                <div class="d-grid gap-2" style="grid-template-columns:1fr 1fr">
+                    <button class="btn btn-outline-secondary btn-sm" onclick="xfDiagnose(this)"><i class="fa fa-stethoscope me-1"></i> What is wrong?</button>
+                    <button class="btn btn-outline-primary btn-sm" onclick="xfRescue(this)"><i class="fa fa-life-ring me-1"></i> Rescue file</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Backups & copy -->
+    <div>
+        <div class="dbx-panel">
+            <div class="dbx-panel-h">
+                <span class="ic violet"><i class="fa fa-box-archive"></i></span>
+                <div><div class="ti">Backups &amp; copy</div><div class="su">Keep your data safe</div></div>
+            </div>
+            <div class="dbx-panel-b">
+                <ul class="dbx-list">
+                    <li><i class="fa fa-right-left"></i><span><b>Copy</b> data between XAMPP and Supabase.</span></li>
+                    <li><i class="fa fa-clock-rotate-left"></i><span>An <b>automatic backup</b> is made before every switch, copy and restore.</span></li>
+                    <li><i class="fa fa-rotate-left"></i><span><b>Restore</b> any backup into the database it came from.</span></li>
+                </ul>
+            </div>
+            <div class="dbx-panel-f">
+                <a href="/backup" class="btn btn-primary"><i class="fa fa-arrow-right me-1"></i> Open Backup page</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Keep Supabase awake -->
+    <div id="keepaliveCard">
+        <div class="dbx-panel">
+            <div class="dbx-panel-h">
+                <span class="ic rose"><i class="fa fa-heart-pulse"></i></span>
+                <div><div class="ti">Keep Supabase awake</div><div class="su">Prevents the free plan pausing</div></div>
+                <span class="dbx-chip off" id="kaChip">checking</span>
+            </div>
+            <div class="dbx-panel-b">
+                <p class="mb-2">The free plan pauses a project after about a week without use. A tiny daily ping prevents that
+                    (runs while this PC is on).</p>
+                <div id="kaState" class="small">Checking...</div>
+                <div id="kaMsg" class="dbx-msg"></div>
+            </div>
+            <div class="dbx-panel-f">
+                <button class="btn btn-success" id="kaOn" onclick="kaEnable(this)"><i class="fa fa-clock me-1"></i> Turn on daily keep-alive</button>
+                <button class="btn btn-outline-danger d-none" id="kaOff" onclick="kaDisable(this)"><i class="fa fa-ban me-1"></i> Turn off keep-alive</button>
+                <button class="btn btn-outline-primary btn-sm" onclick="kaPing(this)"><i class="fa fa-bolt me-1"></i> Ping now</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+</div><!-- /dbx -->
+
+<!-- confirm modal -->
+<div class="modal fade" id="confirmModal" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title" id="cmTitle">Confirm</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <div id="cmBody"></div>
+      <div id="cmForceWrap" class="form-check mt-3 d-none">
+        <input class="form-check-input" type="checkbox" id="cmForce">
+        <label class="form-check-label text-danger" for="cmForce" id="cmForceLabel"></label>
+      </div>
+      <div id="cmTypeWrap" class="mt-3">
+        <label class="form-label small">Type <b>REPLACE</b> to confirm</label>
+        <input id="cmType" class="form-control" autocomplete="off">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+      <button class="btn btn-danger" id="cmOk">Proceed</button>
+    </div>
+  </div></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const LABEL = {mysql: "XAMPP", postgres: "Supabase"};
+const KIND  = {mysql: "Local database on this PC", postgres: "Online database (cloud)"};
+let ST = null, pollTimer = null, cmAction = null;
+
+function esc(s){ return String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function note(html, kind){ document.getElementById("msg").innerHTML =
+    `<div class="alert alert-${kind||"info"} alert-dismissible">${html}<button class="btn-close" data-bs-dismiss="alert"></button></div>`; }
+function num(n){ return Number(n ?? 0).toLocaleString("en-IN"); }
+function dmy(iso){ const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || ""); return m ? `${m[3]}-${m[2]}-${m[1]}` : (iso || "-"); }
+function now12(){
+    const d = new Date(); let h = d.getHours(); const ap = h >= 12 ? "PM" : "AM"; h = h % 12 || 12;
+    const p = x => String(x).padStart(2, "0");
+    return `${p(d.getDate())}-${p(d.getMonth()+1)}-${d.getFullYear()}, ${h}:${p(d.getMinutes())}:${p(d.getSeconds())} ${ap}`;
+}
+
+async function api(url, body){
+    const r = await fetch(url, body === undefined ? {} :
+        {method:"POST", headers:{"Content-Type":"application/json","X-Requested-With":"XMLHttpRequest"}, body: JSON.stringify(body)});
+    let j = {}; try { j = await r.json(); } catch(e) {}
+    return j;
+}
+
+// ---------- one database card ----------
+function dbCard(key, s, active){
+    const nm = LABEL[key];
+    const ico = key === "mysql" ? "fa-hard-drive" : "fa-cloud";
+    const head = `<div class="dbx-card-h">
+        <div class="dbx-ico ${key==='mysql'?'mysql':'pg'}"><i class="fa ${ico}"></i></div>
+        <div><div class="dbx-name">${nm}</div><div class="dbx-kind">${KIND[key]}</div></div>
+        ${active ? '<span class="dbx-pill use"><i class="fa fa-bolt me-1"></i>IN USE</span>' : ""}
+      </div>`;
+    let body;
+    if (!s.ok){
+        const notRunning = key === "mysql" && /2003|10061|refused|can.t connect/i.test(s.error || "");
+        if (notRunning){
+            body = `<div class="dbx-status idle"><i class="fa fa-circle-pause"></i> Not running</div>
+              <div class="dbx-err">XAMPP MySQL has not been started. This is normal &mdash; your data is safe.
+                 <div class="mt-2"><button class="btn btn-success btn-sm" onclick="startMysql(this)"><i class="fa fa-play me-1"></i> Start MySQL now</button></div></div>
+              <div class="dbx-foot"><span class="when">Start it, then use <b>Copy</b> on the Backup page to refresh its data.</span></div>`;
+        } else {
+            body = `<div class="dbx-status bad"><i class="fa fa-circle-xmark"></i> Not reachable</div>
+              <div class="dbx-err">${esc(s.error||"")}</div>
+              <div class="dbx-foot"><span class="when">Check the connection and press Refresh.</span></div>`;
+        }
+    } else {
+        const t = s.tables;
+        const action = active
+            ? `<span class="badge bg-success-subtle text-success-emphasis border border-success-subtle px-3 py-2"><i class="fa fa-check me-1"></i> Active database</span>`
+            : `<button class="btn btn-success btn-sm px-3" onclick="doSwitch('${key}')"><i class="fa fa-right-left me-1"></i> Switch to ${nm}</button>`;
+        body = `<div class="dbx-status ok"><i class="fa fa-circle-check"></i> Connected</div>
+          <div class="dbx-tiles">
+            <div class="dbx-tile big"><div class="n">${num(t.bookings)}</div><div class="l">Bookings</div></div>
+            <div class="dbx-tile"><div class="n">${num(t.rates)}</div><div class="l">Rates</div></div>
+            <div class="dbx-tile"><div class="n">${num(t.zones)}</div><div class="l">Zones</div></div>
+            <div class="dbx-tile"><div class="n">${num(t.place_zones)}</div><div class="l">Place zones</div></div>
+            <div class="dbx-tile"><div class="n">${num(t.app_users)}</div><div class="l">Login users</div></div>
+          </div>
+          <div class="dbx-foot">
+            <span class="when"><i class="fa fa-calendar-day me-1"></i> Latest booking <b>${dmy(s.latest)}</b></span>
+            ${action}
+          </div>`;
+    }
+    return `<div class="col-lg-6"><div class="dbx-card ${active?'active':''}">${head}${body}</div></div>`;
+}
+
+// ---------- sync strip ----------
+function syncStrip(sm){
+    const a = sm.mysql, b = sm.postgres;
+    let cls, ico, html;
+    if (!a.ok || !b.ok){
+        cls = "warn"; ico = "fa-triangle-exclamation";
+        const down = [!a.ok ? "XAMPP" : null, !b.ok ? "Supabase" : null].filter(Boolean).join(" and ");
+        html = `<b>${down} ${(!a.ok && !b.ok) ? "are" : "is"} not reachable</b> &mdash; the two databases cannot be compared right now.`;
+    } else {
+        const d = b.tables.bookings - a.tables.bookings;
+        if (d === 0 && a.latest === b.latest){
+            cls = "ok"; ico = "fa-circle-check";
+            html = `<b>In sync.</b> Both databases hold ${num(a.tables.bookings)} bookings, latest ${dmy(a.latest)}.`;
+        } else {
+            cls = "diff"; ico = "fa-code-compare";
+            const who = d > 0 ? "Supabase" : d < 0 ? "XAMPP" : "";
+            const more = Math.abs(d);
+            html = d !== 0
+              ? `<b>Not in sync.</b> ${who} has <b>${num(more)}</b> more booking${more===1?"":"s"} than ${who==="Supabase"?"XAMPP":"Supabase"} `
+                + `(latest ${dmy(b.latest)} on Supabase vs ${dmy(a.latest)} on XAMPP). Use <b>Copy</b> on the Backup page to bring them level.`
+              : `<b>Not in sync.</b> Same number of bookings, but the latest dates differ (Supabase ${dmy(b.latest)} vs XAMPP ${dmy(a.latest)}).`;
+        }
+    }
+    return `<div class="dbx-sync ${cls}"><i class="fa ${ico}"></i><div>${html}</div></div>`;
+}
+
+async function loadStatus(){
+    const s = await api("/database/status");
+    if (!s.summaries){ note("Could not load status. " + esc(s.error||""), "danger"); return; }
+    ST = s;
+    document.getElementById("refreshed").textContent = "updated " + now12();
+    document.getElementById("activeBadge").textContent = s.active_label;
+    const act = s.summaries[s.active];
+    document.getElementById("liveDot").classList.toggle("off", !(act && act.ok));
+    document.getElementById("syncStrip").innerHTML = syncStrip(s.summaries);
+    document.getElementById("dbCards").innerHTML =
+        dbCard("mysql", s.summaries.mysql, s.active==="mysql") + dbCard("postgres", s.summaries.postgres, s.active==="postgres");
+    const m = s.mysql;
+    const pathEl = document.getElementById("mysqlPath");
+    pathEl.textContent = m.mysqld_found ? m.mysqld_path : "not found on this PC";
+    pathEl.title = m.mysqld_found ? m.mysqld_path : "";
+    const chip = document.getElementById("mysqlChip");
+    if (!m.mysqld_found){ chip.className = "dbx-chip bad"; chip.textContent = "Not installed"; }
+    else if (m.listening){ chip.className = "dbx-chip ok"; chip.textContent = "Running \u00b7 port " + m.port; }
+    else { chip.className = "dbx-chip idle"; chip.textContent = "Stopped"; }
+    document.getElementById("portInput").value = m.port;
+    if (s.job && s.job.state === "running") watchJob();
+}
+
+// ---------- confirm modal ----------
+function openConfirm({title, body, needType=true, forceLabel="", okLabel="Proceed", action}){
+    document.getElementById("cmTitle").textContent = title;
+    document.getElementById("cmBody").innerHTML = body;
+    document.getElementById("cmType").value = "";
+    document.getElementById("cmTypeWrap").classList.toggle("d-none", !needType);
+    document.getElementById("cmForceWrap").classList.toggle("d-none", !forceLabel);
+    document.getElementById("cmForce").checked = false;
+    document.getElementById("cmForceLabel").textContent = forceLabel;
+    document.getElementById("cmOk").textContent = okLabel;
+    cmAction = action;
+    bootstrap.Modal.getOrCreateInstance(document.getElementById("confirmModal")).show();
+}
+document.getElementById("cmOk").addEventListener("click", () => {
+    const typed = document.getElementById("cmType").value.trim().toUpperCase();
+    const needType = !document.getElementById("cmTypeWrap").classList.contains("d-none");
+    const needForce = !document.getElementById("cmForceWrap").classList.contains("d-none");
+    if (needType && typed !== "REPLACE"){ document.getElementById("cmType").classList.add("is-invalid"); return; }
+    if (needForce && !document.getElementById("cmForce").checked){ return; }
+    document.getElementById("cmType").classList.remove("is-invalid");
+    bootstrap.Modal.getInstance(document.getElementById("confirmModal")).hide();
+    cmAction && cmAction({force: document.getElementById("cmForce").checked, confirm: "REPLACE"});
+});
+
+// ---------- actions ----------
+function summaryLine(s){
+    return s.ok ? `${num(s.tables.bookings)} bookings, ${num(s.tables.rates)} rates, latest ${dmy(s.latest)}` : `<span class="text-danger">not reachable</span>`;
+}
+
+function doSwitch(to){
+    const s = ST && ST.summaries[to];
+    openConfirm({
+        title: `Switch to ${LABEL[to]}`,
+        body: `<p>The app will use <b>${LABEL[to]}</b> from now on.</p>
+               <p class="small mb-1">${LABEL[to]} currently has: ${s ? summaryLine(s) : "?"}</p>
+               <p class="small text-muted mb-0">Switching does <b>not</b> copy data - use Copy on the Backup page first if ${LABEL[to]} is out of date.
+               Both databases are backed up automatically. You will need to log in again.</p>`,
+        needType: false, okLabel: `Switch to ${LABEL[to]}`,
+        action: async () => {
+            const r = await api("/database/switch", {to});
+            if (!r.ok){ note(esc(r.error||"Could not start"), "danger"); return; }
+            watchJob();
+        }
+    });
+}
+
+async function startMysql(btn){
+    btn.disabled = true; document.getElementById("mysqlMsg").innerHTML = "Starting MySQL (up to 45 s)...";
+    const r = await api("/database/mysql/start", {});
+    document.getElementById("mysqlMsg").innerHTML = `<span class="${r.ok?'text-success':'text-danger'}">${esc(r.message||r.error||"")}</span>`;
+    btn.disabled = false; loadStatus();
+}
+async function savePort(){
+    const port = parseInt(document.getElementById("portInput").value, 10);
+    const cur = ST && ST.mysql ? ST.mysql.port : null;
+    if (!port){ document.getElementById("mysqlMsg").innerHTML = '<span class="text-danger">Enter a port number.</span>'; return; }
+    if (port === cur){ document.getElementById("mysqlMsg").innerHTML = '<span class="text-muted">MySQL is already set to port ' + port + '.</span>'; return; }
+    openConfirm({
+        title: "Change MySQL port to " + port,
+        body: `<p>XAMPP's MySQL will be <b>stopped</b> (cleanly) on port ${cur} and <b>started again on port ${port}</b>.</p>
+               <p class="small text-muted mb-0">Anyone using the app on XAMPP loses the connection for a few seconds. If port ${port}
+               is used by another program, nothing is changed.</p>`,
+        needType: false, okLabel: "Stop and restart on " + port,
+        action: async () => {
+            document.getElementById("mysqlMsg").innerHTML = "Stopping MySQL and starting it on port " + port + " (up to 1 minute)...";
+            const r = await api("/database/mysql/port", {port});
+            document.getElementById("mysqlMsg").innerHTML =
+                `<span class="${r.ok?'text-success':'text-danger'}">${esc(r.message||r.error||"")}</span>`;
+            loadStatus();
+        }
+    });
+}
+
+// ---------- job progress ----------
+function watchJob(){
+    document.getElementById("jobBox").classList.remove("d-none");
+    document.getElementById("jobResult").innerHTML = "";
+    clearInterval(pollTimer);
+    const tick = async () => {
+        const j = await api("/database/job");
+        const bar = document.getElementById("jobBar");
+        document.getElementById("jobTitle").textContent = ({switch:"Switching database", transfer:"Copying data", restore:"Restoring backup", repair:"Repairing XAMPP data", rescue:"Creating rescue file"})[j.kind] || "Working";
+        document.getElementById("jobPct").textContent = (j.pct||0) + "%";
+        bar.style.width = (j.pct||0) + "%";
+        document.getElementById("jobMsg").textContent = j.message || "";
+        if (j.state === "running") return;
+        clearInterval(pollTimer);
+        bar.classList.remove("progress-bar-animated");
+        if (j.state === "done"){
+            bar.classList.add("bg-success");
+            const r = j.result || {};
+            if (j.kind === "repair"){ document.getElementById("jobResult").innerHTML = xfRepairHtml(r); loadStatus(); return; }
+            if (j.kind === "rescue"){ document.getElementById("jobResult").innerHTML = r.path
+                ? `<span class="text-success"><b>Rescue file created</b> (${r.size_mb} MB)</span><div class="text-muted"><code>${esc(r.path)}</code><br>Send this file to support.</div>`
+                : `<span class="text-danger">Failed.</span>`; return; }
+            let html = `<span class="text-success"><b>Finished.</b></span>`;
+            if (r.counts) html += ` ${num(r.counts.bookings)} bookings, ${num(r.counts.rates)} rates copied.`;
+            const b = r.backups ? Object.values(r.backups) : [r.backup_source, r.backup_target, r.backup_before].filter(Boolean);
+            if (b.length) html += `<div class="text-muted">Backups: ${b.map(x=>"<code>"+esc(x)+"</code>").join("<br>")}</div>`;
+            document.getElementById("jobResult").innerHTML = html;
+            if (j.kind === "switch") setTimeout(() => { window.location = "/logout"; }, 2500);
+        } else {
+            bar.classList.add("bg-danger");
+            document.getElementById("jobResult").innerHTML = `<span class="text-danger"><b>${j.state === "blocked" ? "Stopped" : "Failed"}:</b> ${esc(j.error||"")}</span>
+              <div class="text-muted">Nothing was changed.</div>`;
+        }
+        loadStatus();
+    };
+    pollTimer = setInterval(tick, 1000); tick();
+}
+
+// ---------- Supabase keep-alive ----------
+async function kaLoad(){
+    const r = await api("/database/keepalive/status");
+    if (!r.task){ document.getElementById("kaState").textContent = "Could not read status."; return; }
+    const t = r.task, l = r.last;
+    let h = t.installed
+        ? `<span class="text-success"><i class="fa fa-circle-check me-1"></i><b>Daily keep-alive is ON</b></span>
+           <div class="text-muted">Next run: ${esc(t.next_run||"-")}</div>`
+        : `<span class="text-warning"><i class="fa fa-circle-pause me-1"></i><b>Daily keep-alive is OFF</b></span>`;
+    h += l ? `<div class="${l.ok ? "text-muted" : "text-danger"}">Last ping: ${esc(l.when.replace("T"," "))} &mdash; ${l.ok ? "OK" : "FAILED"}</div>`
+           : `<div class="text-muted">No ping recorded yet.</div>`;
+    document.getElementById("kaState").innerHTML = h;
+    const kc = document.getElementById("kaChip");
+    kc.className = "dbx-chip " + (t.installed ? "ok" : "off");
+    kc.textContent = t.installed ? "Daily ON" : "Daily OFF";
+    document.getElementById("kaOn").classList.toggle("d-none", !!t.installed);
+    document.getElementById("kaOff").classList.toggle("d-none", !t.installed);
+}
+async function kaPing(btn){
+    btn.disabled = true; document.getElementById("kaMsg").textContent = "Pinging Supabase...";
+    const r = await api("/database/keepalive/ping", {});
+    btn.disabled = false;
+    document.getElementById("kaMsg").innerHTML = r.ok
+        ? `<span class="text-success">Supabase answered (database ${r.db_ok ? "OK" : "no"}, API ${r.http ?? "-"}).</span>`
+        : `<span class="text-danger">No answer. ${esc(r.message||"")}</span>`;
+    kaLoad();
+}
+async function kaEnable(btn){
+    btn.disabled = true; document.getElementById("kaMsg").textContent = "Creating the daily task...";
+    const r = await api("/database/keepalive/enable", {});
+    btn.disabled = false;
+    document.getElementById("kaMsg").innerHTML = r.ok
+        ? `<span class="text-success">Done - Supabase will be pinged every day at 12:00 PM (or when the PC next starts).</span>`
+        : `<span class="text-danger">Could not create the task: ${esc(r.error||"")}</span>`;
+    kaLoad();
+}
+async function kaDisable(btn){
+    btn.disabled = true; await api("/database/keepalive/disable", {}); btn.disabled = false;
+    document.getElementById("kaMsg").textContent = "Daily keep-alive turned off.";
+    kaLoad();
+}
+
+
+// ---------- XAMPP repair ----------
+function xfRepairHtml(r){
+    if (!r.status) return `<span class="text-danger">${esc(r.message||"Repair stopped.")}</span>`;
+    const cls = r.status === "ok" ? "text-success" : r.status === "partial" ? "text-warning" : "text-danger";
+    const head = r.status === "ok" ? "Repaired" : r.status === "partial" ? "Recovered - please check the data" : "Not repaired";
+    let h = `<div class="${cls} fs-6"><b>${head}</b></div><div>${esc(r.message)}</div>`;
+    if (r.counts) h += `<div class="text-muted">Readable now: ${num(r.counts.bookings)} bookings, ${num(r.counts.rates)} rates, ${num(r.counts.zones)} zones, ${num(r.counts.app_users)} users.</div>`;
+    if (r.warnings && r.warnings.length) h += `<div class="text-danger">${r.warnings.map(esc).join("<br>")}</div>`;
+    if (r.attempts) h += `<div class="text-muted mt-1">${r.attempts.map(a => `${esc(a.name)}: ${a.ok ? "worked" : "did not work"}${a.detail ? " - " + esc(a.detail) : ""}`).join("<br>")}</div>`;
+    const keep = [r.zip && "Safety copy: " + r.zip, r.data_old && "Old data folder kept: " + r.data_old, r.dump && "Exported data: " + r.dump].filter(Boolean);
+    if (keep.length) h += `<div class="text-muted small mt-1">${keep.map(x => "<code>" + esc(x) + "</code>").join("<br>")}</div>`;
+    if (r.status === "failed") h += `<div class="mt-1">Use <b>Switch to Supabase</b> to keep working, and send a rescue file to support.</div>`;
+    return h;
+}
+async function xfDiagnose(btn){
+    btn.disabled = true; document.getElementById("xfMsg").textContent = "Checking...";
+    const r = await api("/database/xampp/diagnose");
+    btn.disabled = false;
+    document.getElementById("xfMsg").innerHTML = `<b>${esc(r.title||"")}</b><br>${esc(r.detail||"")}` +
+        (r.repairable === false ? '<br><span class="text-danger">A data repair will not help with this.</span>' : "") +
+        (r.tail ? `<details class="mt-1"><summary>Last error-log lines</summary><pre class="small mb-0" style="white-space:pre-wrap">${esc(r.tail)}</pre></details>` : "");
+}
+function xfRepair(){
+    openConfirm({
+        title: "Repair XAMPP data",
+        body: `<p>This rebuilds XAMPP's MySQL data folder and keeps your databases.</p>
+               <ul class="small mb-2">
+                 <li>MySQL is stopped, then the whole data folder is <b>zipped</b> as a safety copy.</li>
+                 <li>The old folder is <b>renamed (kept)</b>, never deleted.</li>
+                 <li>If the first method fails, a deeper rescue (export and re-import) is tried.</li>
+                 <li>If nothing works, everything is put back exactly as it was.</li>
+               </ul>
+               <p class="small text-muted mb-0">Takes 1-3 minutes. Anyone using the app on XAMPP is disconnected.</p>`,
+        needType: false, okLabel: "Repair now",
+        action: async () => {
+            const r = await api("/database/xampp/repair", {confirm: "REPAIR"});
+            if (!r.ok){ note(esc(r.error||"Could not start"), "danger"); return; }
+            watchJob();
+        }
+    });
+}
+async function xfRescue(btn){
+    btn.disabled = true;
+    const r = await api("/database/xampp/rescue-file", {});
+    btn.disabled = false;
+    if (!r.ok){ note(esc(r.error||"Could not start"), "danger"); return; }
+    watchJob();
+}
+
+loadStatus();
+kaLoad();
+setInterval(loadStatus, 60000);          // keep the dashboard fresh
+</script>
+{% endblock %}
